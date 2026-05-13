@@ -27,8 +27,10 @@ import lombok.Setter;
 @Table(name = "conversation_participants")
 public class ConversationParticipant {
 
+	// Hibernate 7's @MapsId generator copies FK ids INTO this embeddable; it does not
+	// instantiate it for us, so we must provide a non-null instance up front.
 	@EmbeddedId
-	private ConversationParticipantId id;
+	private ConversationParticipantId id = new ConversationParticipantId();
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@MapsId("conversationId")

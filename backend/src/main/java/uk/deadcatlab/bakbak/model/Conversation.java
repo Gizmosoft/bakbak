@@ -1,5 +1,7 @@
 package uk.deadcatlab.bakbak.model;
 
+import java.time.Instant;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -7,7 +9,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -39,6 +40,7 @@ public class Conversation {
 	private Instant lastMessageAt;
 
 	@PrePersist
+    @SuppressWarnings("unused")
 	void onCreate() {
 		// Mirror DB default for created_at.
 		if (createdAt == null) {

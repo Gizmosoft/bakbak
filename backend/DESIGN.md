@@ -761,7 +761,7 @@ Build in this order — each step depends on the previous.
 - [X] **Step 19:** Create `CreateConversationRequest`, `ConversationResponse` DTOs
 - [X] **Step 20:** Implement `ConversationService` (`getOrCreate`, `listForUser`, `assertParticipant`)
 - [X] **Step 21:** Implement `ConversationController` (POST, GET list)
-- [ ] **Step 22:** Smoke test conversation creation (including duplicate prevention)
+- [X] **Step 22:** Smoke test conversation creation (including duplicate prevention)
 
 ### Phase 7: Message History (REST)
 - [ ] **Step 23:** Create `MessageResponse` DTO
