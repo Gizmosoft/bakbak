@@ -1,5 +1,7 @@
 package uk.deadcatlab.bakbak.model;
 
+import java.time.Instant;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -9,7 +11,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -46,6 +47,7 @@ public class ConversationParticipant {
 	private Instant joinedAt;
 
 	@PrePersist
+    @SuppressWarnings("unused")
 	void onCreate() {
 		// Mirror DB default for joined_at.
 		if (joinedAt == null) {
