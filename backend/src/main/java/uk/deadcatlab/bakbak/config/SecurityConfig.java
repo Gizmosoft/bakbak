@@ -35,7 +35,7 @@ public class SecurityConfig {
 			.exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 			.authorizeHttpRequests(auth -> auth
 				// Public endpoints:
-				.requestMatchers("/api/auth/**", "/error").permitAll()
+				.requestMatchers("/api/auth/**", "/error", "/ws/**").permitAll()
 				// Everything else is protected by default.
 				.anyRequest().authenticated()
 			)

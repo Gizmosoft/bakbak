@@ -770,7 +770,7 @@ Build in this order — each step depends on the previous.
 - [ ] **Step 26:** Smoke test pagination
 
 ### Phase 8: Real-time Messaging (WebSocket)
-- [ ] **Step 27:** Configure `WebSocketConfig` (STOMP broker, `/ws` endpoint)
+- [X] **Step 27:** Configure `WebSocketConfig` (STOMP broker, `/ws` endpoint)
 - [ ] **Step 28:** Implement `WebSocketAuthInterceptor` (JWT validation on CONNECT)
 - [ ] **Step 29:** Implement `ChatController` with `@MessageMapping`
 - [ ] **Step 30:** Implement `MessageService.send` and broadcast logic
