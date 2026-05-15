@@ -764,9 +764,9 @@ Build in this order — each step depends on the previous.
 - [X] **Step 22:** Smoke test conversation creation (including duplicate prevention)
 
 ### Phase 7: Message History (REST)
-- [ ] **Step 23:** Create `MessageResponse` DTO
-- [ ] **Step 24:** Implement `MessageService.getHistory` with cursor pagination
-- [ ] **Step 25:** Implement `MessageController` for `/api/conversations/{id}/messages`
+- [X] **Step 23:** Create `MessageResponse` DTO
+- [X] **Step 24:** Implement `MessageService.getHistory` with cursor pagination
+- [X] **Step 25:** Implement `MessageController` for `/api/conversations/{id}/messages`
 - [ ] **Step 26:** Smoke test pagination
 
 ### Phase 8: Real-time Messaging (WebSocket)

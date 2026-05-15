@@ -162,6 +162,18 @@ public class ConversationService {
 	}
 
 	/**
+	 * Ensures a conversation row exists for {@code conversationId}.
+	 *
+	 * <p>Call before {@link #assertParticipant(Long, Long)} on endpoints that distinguish
+	 * {@code 404} (unknown conversation) from {@code 403} (known conversation, caller not a member).</p>
+	 */
+	@Transactional(readOnly = true)
+	public void requireConversationExists(Long conversationId) {
+		conversationRepository.findById(conversationId)
+			.orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+	}
+
+	/**
 	 * Authorization helper: throws {@link ForbiddenException} if {@code userId} is not a participant
 	 * of the given conversation.
 	 *
