@@ -1,10 +1,12 @@
 package uk.deadcatlab.bakbak.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import uk.deadcatlab.bakbak.websocket.WebSocketAuthInterceptor;
 
 /**
  * STOMP-over-WebSocket messaging infrastructure.
@@ -18,11 +20,23 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  *   <li>User destination prefix {@code /user} so clients can subscribe to {@code /user/queue/errors}.</li>
  * </ul>
  *
- * <p>JWT validation on the STOMP {@code CONNECT} frame and participant checks on subscribe/send are</p>
+ * <p>JWT validation on the STOMP {@code CONNECT} frame is handled by
+ * {@link WebSocketAuthInterceptor}; participant checks on subscribe/send follow in Step 31.</p>
  */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+	private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+
+	public WebSocketConfig(WebSocketAuthInterceptor webSocketAuthInterceptor) {
+		this.webSocketAuthInterceptor = webSocketAuthInterceptor;
+	}
+
+	@Override
+	public void configureClientInboundChannel(ChannelRegistration registration) {
+		registration.interceptors(webSocketAuthInterceptor);
+	}
 
 	@Override
 	public void configureMessageBroker(MessageBrokerRegistry registry) {
