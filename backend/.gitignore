@@ -71,3 +71,7 @@ out/
 
 # ─── VS Code (personal); track shared config with git add -f if needed ────────
 .vscode/
+
+# Python Utilities
+bakbakenv/
+__pycache__/
