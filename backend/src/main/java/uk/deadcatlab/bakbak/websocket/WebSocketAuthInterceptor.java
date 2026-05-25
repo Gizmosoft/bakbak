@@ -19,7 +19,8 @@ import uk.deadcatlab.bakbak.security.UserDetailsServiceImpl;
  *
  * <p>Matches {@code DESIGN.md} §8.1 / §9.4: the client sends
  * {@code Authorization: Bearer <jwt>} on {@code CONNECT} (not on the HTTP handshake). Later
- * {@code SUBSCRIBE} / {@code SEND} authorization is enforced in a separate interceptor (Step 31).</p>
+ * {@code SUBSCRIBE} / {@code SEND} authorization is enforced by
+ * {@link WebSocketAuthorizationInterceptor}.</p>
  */
 @Component
 public class WebSocketAuthInterceptor implements ChannelInterceptor {

@@ -772,9 +772,9 @@ Build in this order — each step depends on the previous.
 ### Phase 8: Real-time Messaging (WebSocket)
 - [X] **Step 27:** Configure `WebSocketConfig` (STOMP broker, `/ws` endpoint)
 - [X] **Step 28:** Implement `WebSocketAuthInterceptor` (JWT validation on CONNECT)
-- [ ] **Step 29:** Implement `ChatController` with `@MessageMapping`
-- [ ] **Step 30:** Implement `MessageService.send` and broadcast logic
-- [ ] **Step 31:** Add participant-check authorization on SUBSCRIBE
+- [X] **Step 29:** Implement `ChatController` with `@MessageMapping`
+- [X] **Step 30:** Implement `MessageService.send` and broadcast logic
+- [X] **Step 31:** Add participant-check authorization on SUBSCRIBE
 - [ ] **Step 32:** Smoke test with two WebSocket clients (wscat or Postman)
 
 ### Phase 9: Polish

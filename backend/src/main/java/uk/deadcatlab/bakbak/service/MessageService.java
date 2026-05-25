@@ -5,13 +5,21 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uk.deadcatlab.bakbak.dto.response.ChatMessageBroadcast;
 import uk.deadcatlab.bakbak.dto.response.MessageResponse;
+import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
+import uk.deadcatlab.bakbak.model.Conversation;
+import uk.deadcatlab.bakbak.model.Message;
+import uk.deadcatlab.bakbak.model.User;
+import uk.deadcatlab.bakbak.repository.ConversationRepository;
 import uk.deadcatlab.bakbak.repository.MessageRepository;
+import uk.deadcatlab.bakbak.repository.UserRepository;
 
 /**
- * Message persistence use-cases: history pagination (REST) and, in later phases, send + broadcast.
+ * Message persistence use-cases: send (WebSocket) and history pagination (REST).
  */
 @Service
 public class MessageService {
@@ -20,9 +28,58 @@ public class MessageService {
 	private static final int MAX_PAGE_SIZE = 100;
 
 	private final MessageRepository messageRepository;
+	private final ConversationRepository conversationRepository;
+	private final UserRepository userRepository;
+	private final SimpMessagingTemplate messagingTemplate;
 
-	public MessageService(MessageRepository messageRepository) {
+	public MessageService(
+		MessageRepository messageRepository,
+		ConversationRepository conversationRepository,
+		UserRepository userRepository,
+		SimpMessagingTemplate messagingTemplate
+	) {
 		this.messageRepository = messageRepository;
+		this.conversationRepository = conversationRepository;
+		this.userRepository = userRepository;
+		this.messagingTemplate = messagingTemplate;
+	}
+
+	/**
+	 * Persists a message, updates {@code conversations.last_message_at}, and broadcasts to
+	 * {@code /topic/conversation/{conversationId}}.
+	 *
+	 * <p>Transactional: one message insert + one conversation update. Authorization (participant
+	 * check) is enforced by callers before this method.</p>
+	 */
+	@Transactional
+	public MessageResponse send(Long conversationId, Long senderId, String content) {
+		Conversation conversation = conversationRepository.findById(conversationId)
+			.orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+		User sender = userRepository.findById(senderId)
+			.orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+		Message message = new Message();
+		message.setConversation(conversation);
+		message.setSender(sender);
+		message.setContent(content);
+
+		Message saved = messageRepository.save(message);
+		Instant createdAt = saved.getCreatedAt();
+
+		conversation.setLastMessageAt(createdAt);
+		conversationRepository.save(conversation);
+
+		MessageResponse response = toMessageResponse(saved);
+		ChatMessageBroadcast broadcast = new ChatMessageBroadcast(
+			response.id(),
+			response.conversationId(),
+			response.senderId(),
+			sender.getUsername(),
+			response.content(),
+			response.createdAt()
+		);
+		messagingTemplate.convertAndSend(topicDestination(conversationId), broadcast);
+		return response;
 	}
 
 	/**
@@ -55,5 +112,19 @@ public class MessageService {
 		ArrayList<MessageResponse> chronological = new ArrayList<>(newestFirst);
 		Collections.reverse(chronological);
 		return chronological;
+	}
+
+	private static String topicDestination(Long conversationId) {
+		return "/topic/conversation/" + conversationId;
+	}
+
+	private static MessageResponse toMessageResponse(Message message) {
+		return new MessageResponse(
+			message.getId(),
+			message.getConversation().getId(),
+			message.getSender().getId(),
+			message.getContent(),
+			message.getCreatedAt()
+		);
 	}
 }

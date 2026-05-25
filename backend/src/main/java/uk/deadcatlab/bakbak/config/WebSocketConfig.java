@@ -6,7 +6,9 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
 import uk.deadcatlab.bakbak.websocket.WebSocketAuthInterceptor;
+import uk.deadcatlab.bakbak.websocket.WebSocketAuthorizationInterceptor;
 
 /**
  * STOMP-over-WebSocket messaging infrastructure.
@@ -20,22 +22,28 @@ import uk.deadcatlab.bakbak.websocket.WebSocketAuthInterceptor;
  *   <li>User destination prefix {@code /user} so clients can subscribe to {@code /user/queue/errors}.</li>
  * </ul>
  *
- * <p>JWT validation on the STOMP {@code CONNECT} frame is handled by
- * {@link WebSocketAuthInterceptor}; participant checks on subscribe/send follow in Step 31.</p>
+ * <p>Inbound channel interceptors (in order): {@link WebSocketAuthInterceptor} (JWT on
+ * {@code CONNECT}), then {@link WebSocketAuthorizationInterceptor} (participant checks on
+ * {@code SUBSCRIBE} / {@code SEND}).</p>
  */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+	private final WebSocketAuthorizationInterceptor webSocketAuthorizationInterceptor;
 
-	public WebSocketConfig(WebSocketAuthInterceptor webSocketAuthInterceptor) {
+	public WebSocketConfig(
+		WebSocketAuthInterceptor webSocketAuthInterceptor,
+		WebSocketAuthorizationInterceptor webSocketAuthorizationInterceptor
+	) {
 		this.webSocketAuthInterceptor = webSocketAuthInterceptor;
+		this.webSocketAuthorizationInterceptor = webSocketAuthorizationInterceptor;
 	}
 
 	@Override
 	public void configureClientInboundChannel(ChannelRegistration registration) {
-		registration.interceptors(webSocketAuthInterceptor);
+		registration.interceptors(webSocketAuthInterceptor, webSocketAuthorizationInterceptor);
 	}
 
 	@Override
@@ -47,9 +55,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
+		// This is the endpoint that the client will connect to.
+		// This speaks SockJS, which is a fallback for browsers that don't support WebSocket.
 		registry.addEndpoint("/ws")
 			// Broad pattern for local dev
 			.setAllowedOriginPatterns("*")
 			.withSockJS();
+		
+		// This is the endpoint that the client will connect to.
+		// This speaks plain WebSocket, which is a fallback for browsers that don't support SockJS.
+		registry.addEndpoint("/ws-native")
+			// Broad pattern for local dev
+    		.setAllowedOriginPatterns("*");
 	}
 }

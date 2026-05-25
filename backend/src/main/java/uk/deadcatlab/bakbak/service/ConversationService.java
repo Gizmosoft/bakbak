@@ -177,8 +177,8 @@ public class ConversationService {
 	 * Authorization helper: throws {@link ForbiddenException} if {@code userId} is not a participant
 	 * of the given conversation.
 	 *
-	 * <p>Callers (REST controllers, WebSocket handlers) should invoke this before exposing any
-	 * conversation-scoped data.</p>
+	 * <p>Callers (REST controllers, {@link uk.deadcatlab.bakbak.websocket.WebSocketAuthorizationInterceptor})
+	 * should invoke this before exposing any conversation-scoped data.</p>
 	 */
 	@Transactional(readOnly = true)
 	public void assertParticipant(Long conversationId, Long userId) {
