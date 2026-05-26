@@ -775,11 +775,11 @@ Build in this order — each step depends on the previous.
 - [X] **Step 29:** Implement `ChatController` with `@MessageMapping`
 - [X] **Step 30:** Implement `MessageService.send` and broadcast logic
 - [X] **Step 31:** Add participant-check authorization on SUBSCRIBE
-- [ ] **Step 32:** Smoke test with two WebSocket clients (wscat or Postman)
+- [X] **Step 32:** Smoke test with two WebSocket clients (wscat or Postman)
 
 ### Phase 9: Polish
-- [ ] **Step 33:** Implement `GlobalExceptionHandler` and custom exception classes
-- [ ] **Step 34:** Configure `CorsConfig` for future React Native access
+- [X] **Step 33:** Implement `GlobalExceptionHandler` and custom exception classes
+- [X] **Step 34:** Configure `CorsConfig` for future React Native access
 - [ ] **Step 35:** Add structured logging; remove debug logs from prod config
 - [ ] **Step 36:** End-to-end smoke test of entire flow
 

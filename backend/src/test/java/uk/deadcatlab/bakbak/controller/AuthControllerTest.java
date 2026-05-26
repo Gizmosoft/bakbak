@@ -21,6 +21,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
+import uk.deadcatlab.bakbak.config.CorsConfig;
 import uk.deadcatlab.bakbak.config.SecurityConfig;
 import uk.deadcatlab.bakbak.dto.request.LoginRequest;
 import uk.deadcatlab.bakbak.dto.request.RegisterRequest;
@@ -29,6 +30,8 @@ import uk.deadcatlab.bakbak.dto.response.UserResponse;
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
 import uk.deadcatlab.bakbak.security.JwtUtil;
 import uk.deadcatlab.bakbak.security.UserDetailsServiceImpl;
+import uk.deadcatlab.bakbak.exception.ConflictException;
+import uk.deadcatlab.bakbak.exception.GlobalExceptionHandler;
 import uk.deadcatlab.bakbak.service.AuthService;
 
 /**
@@ -38,7 +41,14 @@ import uk.deadcatlab.bakbak.service.AuthService;
  * conflict, bad credentials) are exercised end-to-end through the HTTP / security stack.</p>
  */
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, JwtUtil.class, JacksonAutoConfiguration.class})
+@Import({
+	CorsConfig.class,
+	SecurityConfig.class,
+	JwtAuthFilter.class,
+	JwtUtil.class,
+	JacksonAutoConfiguration.class,
+	GlobalExceptionHandler.class
+})
 @TestPropertySource(properties = {
 	"jwt.secret=" + WebLayerTestSupport.TEST_JWT_SECRET,
 	"jwt.expiration-ms=3600000"
@@ -77,14 +87,18 @@ class AuthControllerTest {
 	@Test
 	void register_serviceReportsConflict_returns409() throws Exception {
 		when(authService.register(any(RegisterRequest.class)))
-			.thenThrow(new IllegalStateException("Email is already registered"));
+			.thenThrow(new ConflictException("Email is already registered"));
 		String body = objectMapper.writeValueAsString(new RegisterRequest(
 			"alice", "alice@example.com", "Str0ngPass!", "Alice", LocalDate.of(1998, 5, 12)));
 
 		mockMvc.perform(post("/api/auth/register")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body))
-			.andExpect(status().isConflict());
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.status").value(409))
+			.andExpect(jsonPath("$.error").value("Conflict"))
+			.andExpect(jsonPath("$.message").value("Email is already registered"))
+			.andExpect(jsonPath("$.path").value("/api/auth/register"));
 	}
 
 	@Test

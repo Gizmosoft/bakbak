@@ -20,12 +20,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import uk.deadcatlab.bakbak.config.CorsConfig;
 import uk.deadcatlab.bakbak.config.SecurityConfig;
 import uk.deadcatlab.bakbak.dto.response.UserPublicResponse;
 import uk.deadcatlab.bakbak.dto.response.UserResponse;
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
 import uk.deadcatlab.bakbak.security.JwtUtil;
 import uk.deadcatlab.bakbak.security.UserDetailsServiceImpl;
+import uk.deadcatlab.bakbak.exception.GlobalExceptionHandler;
 import uk.deadcatlab.bakbak.service.UserService;
 
 /**
@@ -35,7 +37,14 @@ import uk.deadcatlab.bakbak.service.UserService;
  * security filter chain so JWT enforcement and the controller's limit clamping are covered.</p>
  */
 @WebMvcTest(UserController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, JwtUtil.class, JacksonAutoConfiguration.class})
+@Import({
+	CorsConfig.class,
+	SecurityConfig.class,
+	JwtAuthFilter.class,
+	JwtUtil.class,
+	JacksonAutoConfiguration.class,
+	GlobalExceptionHandler.class
+})
 @TestPropertySource(properties = {
 	"jwt.secret=" + WebLayerTestSupport.TEST_JWT_SECRET,
 	"jwt.expiration-ms=3600000"

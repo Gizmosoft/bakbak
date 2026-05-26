@@ -101,11 +101,10 @@ public class MessageService {
 	@Transactional(readOnly = true)
 	public List<MessageResponse> getHistory(Long conversationId, Instant before, int limit) {
 		int effectiveLimit = Math.clamp(limit, MIN_PAGE_SIZE, MAX_PAGE_SIZE);
-		List<MessageResponse> newestFirst = messageRepository.findHistoryPage(
-			conversationId,
-			before,
-			PageRequest.of(0, effectiveLimit)
-		);
+		PageRequest page = PageRequest.of(0, effectiveLimit);
+		List<MessageResponse> newestFirst = before == null
+			? messageRepository.findNewestPage(conversationId, page)
+			: messageRepository.findHistoryPageBefore(conversationId, before, page);
 		if (newestFirst.isEmpty()) {
 			return List.of();
 		}

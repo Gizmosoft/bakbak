@@ -8,6 +8,7 @@ import uk.deadcatlab.bakbak.dto.request.LoginRequest;
 import uk.deadcatlab.bakbak.dto.request.RegisterRequest;
 import uk.deadcatlab.bakbak.dto.response.AuthResponse;
 import uk.deadcatlab.bakbak.dto.response.UserResponse;
+import uk.deadcatlab.bakbak.exception.ConflictException;
 import uk.deadcatlab.bakbak.model.User;
 import uk.deadcatlab.bakbak.repository.UserRepository;
 import uk.deadcatlab.bakbak.security.JwtUtil;
@@ -34,10 +35,10 @@ public class AuthService {
 	public AuthResponse register(RegisterRequest request) {
 		// App-level uniqueness checks give cleaner errors than relying solely on DB constraints.
 		userRepository.findByUsername(request.username()).ifPresent(u -> {
-			throw new IllegalStateException("Username is already taken");
+			throw new ConflictException("Username is already taken");
 		});
 		userRepository.findByEmail(request.email()).ifPresent(u -> {
-			throw new IllegalStateException("Email is already registered");
+			throw new ConflictException("Email is already registered");
 		});
 
 		User user = new User();

@@ -25,11 +25,13 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
+import uk.deadcatlab.bakbak.config.CorsConfig;
 import uk.deadcatlab.bakbak.config.SecurityConfig;
 import uk.deadcatlab.bakbak.dto.request.CreateConversationRequest;
 import uk.deadcatlab.bakbak.dto.response.ConversationResponse;
 import uk.deadcatlab.bakbak.dto.response.ConversationResponse.LastMessagePreview;
 import uk.deadcatlab.bakbak.dto.response.UserPublicResponse;
+import uk.deadcatlab.bakbak.exception.GlobalExceptionHandler;
 import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
 import uk.deadcatlab.bakbak.security.JwtUtil;
@@ -45,7 +47,14 @@ import uk.deadcatlab.bakbak.service.UserService;
  * the contact-window listing — all through the real security filter chain.</p>
  */
 @WebMvcTest(ConversationController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, JwtUtil.class, JacksonAutoConfiguration.class})
+@Import({
+	CorsConfig.class,
+	SecurityConfig.class,
+	JwtAuthFilter.class,
+	JwtUtil.class,
+	JacksonAutoConfiguration.class,
+	GlobalExceptionHandler.class
+})
 @TestPropertySource(properties = {
 	"jwt.secret=" + WebLayerTestSupport.TEST_JWT_SECRET,
 	"jwt.expiration-ms=3600000"

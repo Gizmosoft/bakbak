@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
 
@@ -26,10 +27,14 @@ public class SecurityConfig {
 
 	@Bean
     @SuppressWarnings("unused")
-	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+	SecurityFilterChain securityFilterChain(
+		HttpSecurity http,
+		JwtAuthFilter jwtAuthFilter,
+		CorsConfigurationSource corsConfigurationSource
+	) throws Exception {
 		return http
 			.csrf(csrf -> csrf.disable())
-			.cors(cors -> {})
+			.cors(cors -> cors.configurationSource(corsConfigurationSource))
 			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			// Without this, the default entry point is often Http403ForbiddenEntryPoint → 403 for missing JWT.
 			.exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

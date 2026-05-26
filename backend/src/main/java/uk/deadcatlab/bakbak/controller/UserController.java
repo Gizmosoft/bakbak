@@ -1,14 +1,11 @@
 package uk.deadcatlab.bakbak.controller;
 
 import java.util.List;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 import uk.deadcatlab.bakbak.dto.response.UserPublicResponse;
 import uk.deadcatlab.bakbak.dto.response.UserResponse;
 import uk.deadcatlab.bakbak.service.UserService;
@@ -33,7 +30,7 @@ public class UserController {
 
 	@GetMapping("/me")
 	public UserResponse me(Authentication authentication) {
-		long userId = requireCurrentUserId(authentication);
+		long userId = ControllerAuthSupport.requireCurrentUserId(authentication, userService);
 		return userService.getCurrentUser(userId);
 	}
 
@@ -43,18 +40,9 @@ public class UserController {
 		@RequestParam(required = false) Integer limit,
 		Authentication authentication
 	) {
-		long userId = requireCurrentUserId(authentication);
+		long userId = ControllerAuthSupport.requireCurrentUserId(authentication, userService);
 		int effectiveLimit = limit == null ? DEFAULT_SEARCH_LIMIT : limit;
 		effectiveLimit = Math.clamp(effectiveLimit, 1, MAX_SEARCH_LIMIT);
 		return userService.searchByUsername(q, userId, effectiveLimit);
-	}
-
-	private long requireCurrentUserId(Authentication authentication) {
-		if (authentication == null
-			|| !authentication.isAuthenticated()
-			|| authentication instanceof AnonymousAuthenticationToken) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
-		}
-		return userService.requireUserIdByUsername(authentication.getName());
 	}
 }

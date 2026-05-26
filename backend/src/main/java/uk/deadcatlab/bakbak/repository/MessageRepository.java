@@ -18,24 +18,33 @@ import uk.deadcatlab.bakbak.model.Message;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
 	/**
-	 * Cursor-based history page: up to {@code pageable.getPageSize()} messages strictly older than
-	 * {@code before}, or the newest messages when {@code before} is {@code null}.
-	 *
-	 * <p>Rows are returned in {@code created_at DESC} order (newest in this window first). Callers
-	 * typically reverse to chronological ascending for API responses.</p>
-	 *
-	 * <p>Uses {@code created_at < :before} (strict) so the client can safely use the oldest
-	 * {@code createdAt} from the previous page as the next cursor without duplicates.</p>
+	 * Newest messages in a conversation (first page when no {@code before} cursor is supplied).
 	 */
 	@Query("""
 			select new uk.deadcatlab.bakbak.dto.response.MessageResponse(
 				m.id, m.conversation.id, m.sender.id, m.content, m.createdAt)
 			from Message m
 			where m.conversation.id = :convId
-			  and (:before is null or m.createdAt < :before)
 			order by m.createdAt desc
 			""")
-	List<MessageResponse> findHistoryPage(
+	List<MessageResponse> findNewestPage(
+		@Param("convId") Long conversationId,
+		Pageable pageable
+	);
+
+	/**
+	 * Messages strictly older than {@code before} ({@code created_at < before}), newest in that
+	 * window first — used for cursor pagination.
+	 */
+	@Query("""
+			select new uk.deadcatlab.bakbak.dto.response.MessageResponse(
+				m.id, m.conversation.id, m.sender.id, m.content, m.createdAt)
+			from Message m
+			where m.conversation.id = :convId
+			  and m.createdAt < :before
+			order by m.createdAt desc
+			""")
+	List<MessageResponse> findHistoryPageBefore(
 		@Param("convId") Long conversationId,
 		@Param("before") Instant before,
 		Pageable pageable
