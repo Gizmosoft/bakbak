@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "gup-ui",
+    "slug": "gup-ui",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/gup.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/gup.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A1B3A"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/gup.png",
+        "backgroundColor": "#1A1B3A"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/gup.png"
+    }
+  }
+}
