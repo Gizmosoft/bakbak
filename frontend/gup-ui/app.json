@@ -31,6 +31,14 @@
         "projectId": "fbf25c49-8c88-416d-b780-922040ec3e67"
       }
     },
-    "owner": "deadcat_dev"
+    "owner": "deadcat_dev",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "scheme": "gup",
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }
