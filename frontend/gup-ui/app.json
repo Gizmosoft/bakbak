@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "gup-ui",
-    "slug": "gup-ui",
+    "slug": "gup",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/gup.png",
@@ -25,6 +25,12 @@
     },
     "web": {
       "favicon": "./assets/gup.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fbf25c49-8c88-416d-b780-922040ec3e67"
+      }
+    },
+    "owner": "deadcat_dev"
   }
 }
