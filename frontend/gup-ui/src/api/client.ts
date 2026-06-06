@@ -16,9 +16,18 @@ type TokenGetter = () => string | null;
 
 let tokenGetter: TokenGetter = () => null;
 
+type UnauthorizedHandler = () => void | Promise<void>;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
 /** Called by auth layer (Phase 2) to supply the current JWT. */
 export function setTokenGetter(getter: TokenGetter): void {
   tokenGetter = getter;
+}
+
+/** Called by auth layer to clear session when an authenticated request returns 401. */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
 }
 
 function buildUrl(path: string, params?: ApiRequestOptions['params']): string {
@@ -86,6 +95,10 @@ export async function apiRequest<T>(
     errorBody = await response.json();
   } catch {
     errorBody = undefined;
+  }
+
+  if (response.status === 401 && auth !== false && unauthorizedHandler) {
+    await unauthorizedHandler();
   }
 
   throw toApiError(response.status, path, errorBody);

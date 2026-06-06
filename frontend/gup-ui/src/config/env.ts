@@ -6,9 +6,14 @@ export function getApiBaseUrl(): string {
   return url.replace(/\/$/, '');
 }
 
-/** WebSocket URL derived from the API base (http → ws, https → wss) + /ws. */
-export function getWebSocketUrl(): string {
+/** WebSocket URL for raw STOMP (React Native uses /ws-native, not SockJS /ws). */
+export function getWebSocketNativeUrl(): string {
   const base = getApiBaseUrl();
-  const wsBase = base.replace(/^http/, 'ws');
-  return `${wsBase}/ws`;
+  const wsBase = base.replace(/^https/, 'wss').replace(/^http/, 'ws');
+  return `${wsBase}/ws-native`;
+}
+
+/** @deprecated Use getWebSocketNativeUrl for the mobile STOMP client. */
+export function getWebSocketUrl(): string {
+  return getWebSocketNativeUrl();
 }

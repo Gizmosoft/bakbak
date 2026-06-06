@@ -1,5 +1,5 @@
 export { register, login } from './auth.api';
-export { apiRequest, setTokenGetter } from './client';
+export { apiRequest, setTokenGetter, setUnauthorizedHandler } from './client';
 export type { ApiRequestOptions } from './client';
 export {
   ApiError,

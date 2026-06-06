@@ -1,0 +1,83 @@
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { formatMessageTime, getInitials } from '@/lib/format';
+import type { ConversationResponse } from '@/types/conversation';
+
+type ConversationListItemProps = {
+  conversation: ConversationResponse;
+  onPress: () => void;
+};
+
+export function ConversationListItem({ conversation, onPress }: ConversationListItemProps) {
+  const displayName = conversation.otherUser.displayName ?? conversation.otherUser.username;
+  const preview = conversation.lastMessage?.content ?? 'No messages yet';
+
+  return (
+    <Pressable style={styles.row} onPress={onPress}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
+      </View>
+      <View style={styles.content}>
+        <View style={styles.topLine}>
+          <Text style={styles.name} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={styles.time}>{formatMessageTime(conversation.lastMessageAt)}</Text>
+        </View>
+        <Text style={styles.preview} numberOfLines={1}>
+          {preview}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#fff',
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1A1B3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  content: {
+    flex: 1,
+  },
+  topLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  name: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1B3A',
+    marginRight: 8,
+  },
+  time: {
+    fontSize: 12,
+    color: '#888',
+  },
+  preview: {
+    fontSize: 14,
+    color: '#666',
+  },
+});
