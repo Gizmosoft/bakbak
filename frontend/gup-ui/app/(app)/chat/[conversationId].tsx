@@ -40,7 +40,7 @@ export default function ChatScreen() {
     refetch,
   } = useMessages(conversationId);
   const [chatError, setChatError] = useState<string | null>(null);
-  const { isConnected } = useChatConnection();
+  const { isConnected, statusMessage } = useChatConnection();
 
   useChatSubscription(conversationId);
 
@@ -151,7 +151,7 @@ export default function ChatScreen() {
         <ChatInput
           onSend={handleSend}
           sendDisabled={!isConnected}
-          hint={isConnected ? null : 'Connecting to chat…'}
+          hint={isConnected ? null : statusMessage ?? 'Connecting to chat…'}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

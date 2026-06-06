@@ -15,11 +15,5 @@ export function ChatConnectionProvider({ children }: { children: React.ReactNode
     }
   }, [isAuthenticated, token]);
 
-  useEffect(() => {
-    return () => {
-      chatClient.disconnect();
-    };
-  }, []);
-
   return children;
 }
