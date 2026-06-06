@@ -13,6 +13,7 @@ import { login as loginApi, register as registerApi } from '@/api/auth.api';
 import { setTokenGetter, setUnauthorizedHandler } from '@/api/client';
 import { getCurrentUser } from '@/api/users.api';
 import { clearAuthToken, getAuthToken, setAuthToken } from '@/lib/token-storage';
+import { clearStoredDrafts } from '@/lib/draft-storage';
 import { queryClient } from '@/providers/QueryProvider';
 import type { LoginRequest, RegisterRequest } from '@/types';
 import type { UserResponse } from '@/types/user';
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     await clearAuthToken();
+    await clearStoredDrafts();
   }, []);
 
   const applySession = useCallback((nextToken: string, nextUser: UserResponse) => {

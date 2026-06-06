@@ -10,20 +10,27 @@ import {
 
 type ChatInputProps = {
   onSend: (content: string) => Promise<void>;
+  value: string;
+  onChangeText: (text: string) => void;
   /** When true, sending is blocked but the user can still type. */
   sendDisabled?: boolean;
   hint?: string | null;
 };
 
-export function ChatInput({ onSend, sendDisabled = false, hint = null }: ChatInputProps) {
-  const [text, setText] = useState('');
+export function ChatInput({
+  onSend,
+  value,
+  onChangeText,
+  sendDisabled = false,
+  hint = null,
+}: ChatInputProps) {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSend = text.trim().length > 0 && !sendDisabled && !isSending;
+  const canSend = value.trim().length > 0 && !sendDisabled && !isSending;
 
   const handleSend = async () => {
-    const content = text.trim();
+    const content = value.trim();
     if (!content) {
       return;
     }
@@ -32,7 +39,7 @@ export function ChatInput({ onSend, sendDisabled = false, hint = null }: ChatInp
     setIsSending(true);
     try {
       await onSend(content);
-      setText('');
+      onChangeText('');
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : 'Failed to send message');
     } finally {
@@ -47,8 +54,8 @@ export function ChatInput({ onSend, sendDisabled = false, hint = null }: ChatInp
       <View style={styles.row}>
         <TextInput
           style={styles.input}
-          value={text}
-          onChangeText={setText}
+          value={value}
+          onChangeText={onChangeText}
           placeholder="Message..."
           placeholderTextColor="#999"
           multiline

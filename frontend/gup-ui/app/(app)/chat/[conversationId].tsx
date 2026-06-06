@@ -20,6 +20,7 @@ import { flattenMessages, useMessages } from '@/features/chat/hooks/useMessages'
 import { sendMessageSchema } from '@/features/chat/schemas';
 import { useConversations } from '@/features/conversations/hooks/useConversations';
 import { useAuth } from '@/providers/AuthProvider';
+import { useChatDrafts } from '@/providers/ChatDraftProvider';
 import { chatClient } from '@/websocket/chat.client';
 import type { MessageResponse } from '@/types/message';
 
@@ -29,6 +30,8 @@ export default function ChatScreen() {
   const conversationId = Number(rawConversationId);
   const { user } = useAuth();
   const { data: conversations } = useConversations();
+  const { getDraftText, setDraftText, getOtherUser, clearDraft, registerConversation } =
+    useChatDrafts();
   const {
     data,
     isLoading,
@@ -50,14 +53,25 @@ export default function ChatScreen() {
   }, []);
 
   const conversation = conversations?.find((item) => item.conversationId === conversationId);
+  const otherUser = conversation?.otherUser ?? getOtherUser(conversationId);
   const headerTitle =
-    conversation?.otherUser.displayName ??
-    conversation?.otherUser.username ??
-    'Chat';
+    otherUser?.displayName ?? otherUser?.username ?? 'Chat';
+  const draftText = getDraftText(conversationId);
 
-  const messages = useMemo(
-    () => flattenMessages(data?.pages) as MessageResponse[],
-    [data?.pages]
+  useEffect(() => {
+    if (conversation) {
+      registerConversation(conversation);
+    }
+  }, [conversation, registerConversation]);
+
+  const handleDraftChange = useCallback(
+    (text: string) => {
+      if (!otherUser) {
+        return;
+      }
+      setDraftText(conversationId, otherUser, text);
+    },
+    [conversationId, otherUser, setDraftText]
   );
 
   const handleSend = useCallback(
@@ -69,8 +83,14 @@ export default function ChatScreen() {
 
       setChatError(null);
       chatClient.sendMessage(conversationId, parsed.data.content);
+      clearDraft(conversationId);
     },
-    [conversationId]
+    [conversationId, clearDraft]
+  );
+
+  const messages = useMemo(
+    () => flattenMessages(data?.pages) as MessageResponse[],
+    [data?.pages]
   );
 
   const handleLoadOlder = () => {
@@ -149,6 +169,8 @@ export default function ChatScreen() {
         )}
 
         <ChatInput
+          value={draftText}
+          onChangeText={handleDraftChange}
           onSend={handleSend}
           sendDisabled={!isConnected}
           hint={isConnected ? null : statusMessage ?? 'Connecting to chat…'}

@@ -1,16 +1,20 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatMessageTime, getInitials } from '@/lib/format';
-import type { ConversationResponse } from '@/types/conversation';
+
+import type { ConversationListRow } from '@/features/conversations/lib/merge-conversations-with-drafts';
 
 type ConversationListItemProps = {
-  conversation: ConversationResponse;
+  conversation: ConversationListRow;
   onPress: () => void;
 };
 
 export function ConversationListItem({ conversation, onPress }: ConversationListItemProps) {
   const displayName = conversation.otherUser.displayName ?? conversation.otherUser.username;
-  const preview = conversation.lastMessage?.content ?? 'No messages yet';
+  const preview = conversation.draftPreview
+    ? `Draft: ${conversation.draftPreview}`
+    : conversation.lastMessage?.content ?? 'No messages yet';
+  const isDraftPreview = Boolean(conversation.draftPreview);
 
   return (
     <Pressable style={styles.row} onPress={onPress}>
@@ -24,7 +28,10 @@ export function ConversationListItem({ conversation, onPress }: ConversationList
           </Text>
           <Text style={styles.time}>{formatMessageTime(conversation.lastMessageAt)}</Text>
         </View>
-        <Text style={styles.preview} numberOfLines={1}>
+        <Text
+          style={[styles.preview, isDraftPreview && styles.draftPreview]}
+          numberOfLines={1}
+        >
           {preview}
         </Text>
       </View>
@@ -79,5 +86,9 @@ const styles = StyleSheet.create({
   preview: {
     fontSize: 14,
     color: '#666',
+  },
+  draftPreview: {
+    fontStyle: 'italic',
+    color: '#888',
   },
 });

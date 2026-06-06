@@ -208,7 +208,8 @@ class ConversationControllerTest {
 				new ConversationResponse(
 					18L,
 					new UserPublicResponse(43L, "carol", "Carol"),
-					null, null)));
+					new LastMessagePreview("hey", 43L),
+					Instant.parse("2026-04-19T12:00:00Z"))));
 
 		mockMvc.perform(get("/api/conversations")
 				.header(HttpHeaders.AUTHORIZATION, "Bearer " + aliceToken()))
@@ -219,7 +220,7 @@ class ConversationControllerTest {
 			.andExpect(jsonPath("$[0].lastMessage.content").value("see you at 5"))
 			.andExpect(jsonPath("$[1].conversationId").value(18))
 			.andExpect(jsonPath("$[1].otherUser.username").value("carol"))
-			.andExpect(jsonPath("$[1].lastMessage").doesNotExist());
+			.andExpect(jsonPath("$[1].lastMessage.content").value("hey"));
 	}
 
 	@Test

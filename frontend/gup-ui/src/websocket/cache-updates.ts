@@ -52,6 +52,7 @@ export function updateConversationPreview(
 ): void {
   queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (current) => {
     if (!current) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       return current;
     }
 
@@ -59,6 +60,7 @@ export function updateConversationPreview(
       (conversation) => conversation.conversationId === broadcast.conversationId
     );
     if (index === -1) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       return current;
     }
 

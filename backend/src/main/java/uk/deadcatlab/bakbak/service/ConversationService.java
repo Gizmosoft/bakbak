@@ -122,10 +122,11 @@ public class ConversationService {
 	}
 
 	/**
-	 * Returns the contact-window listing for {@code userId}: every conversation they participate in,
-	 * each enriched with the other participant's public profile and a preview of the latest message.
+	 * Returns the contact-window listing for {@code userId}: conversations they participate in that
+	 * have at least one message, each enriched with the other participant's profile and a preview of
+	 * the latest message.
 	 *
-	 * <p>Sorted by {@code lastMessageAt DESC} with empty conversations (no messages yet) at the end.</p>
+	 * <p>Sorted by {@code lastMessageAt DESC}. Empty threads (no messages yet) are omitted.</p>
 	 */
 	@Transactional(readOnly = true)
 	public List<ConversationResponse> listForUser(Long userId) {

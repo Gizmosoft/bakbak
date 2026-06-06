@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -14,14 +13,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createOrFetchConversation } from '@/api/conversations.api';
 import { isApiError } from '@/api/errors';
-import { queryKeys } from '@/constants/query-keys';
 import { useUserSearch } from '@/features/search/hooks/useUserSearch';
 import { getInitials } from '@/lib/format';
+import { useChatDrafts } from '@/providers/ChatDraftProvider';
 import type { UserPublicResponse } from '@/types/user';
 
 /** Search route (/search). Find users and start a 1:1 conversation. */
 export default function SearchScreen() {
-  const queryClient = useQueryClient();
+  const { registerConversation } = useChatDrafts();
   const [query, setQuery] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
   const [startingUserId, setStartingUserId] = useState<number | null>(null);
@@ -32,7 +31,7 @@ export default function SearchScreen() {
     setStartingUserId(user.id);
     try {
       const conversation = await createOrFetchConversation({ targetUserId: user.id });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      registerConversation(conversation);
       router.replace(`/chat/${conversation.conversationId}` as Href);
     } catch (error) {
       setApiError(isApiError(error) ? error.message : 'Failed to start conversation');

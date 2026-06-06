@@ -11,13 +11,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConversationListItem } from '@/features/conversations/components/ConversationListItem';
-import { useConversations } from '@/features/conversations/hooks/useConversations';
+import { useConversationList } from '@/features/conversations/hooks/useConversationList';
 import { useAuth } from '@/providers/AuthProvider';
 
 /** Authenticated home route (/). Contact window — list of 1:1 conversations. */
 export default function ConversationsScreen() {
   const { logout } = useAuth();
-  const { data, isLoading, isError, error, refetch, isRefetching } = useConversations();
+  const { rows, isLoading, isError, error, refetch, isRefetching } = useConversationList();
 
   const handleOpenChat = (conversationId: number) => {
     router.push(`/chat/${conversationId}` as Href);
@@ -54,7 +54,7 @@ export default function ConversationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={data ?? []}
+          data={rows}
           keyExtractor={(item) => String(item.conversationId)}
           renderItem={({ item }) => (
             <ConversationListItem
@@ -75,7 +75,7 @@ export default function ConversationsScreen() {
               </Pressable>
             </View>
           }
-          contentContainerStyle={(data?.length ?? 0) === 0 ? styles.emptyList : undefined}
+          contentContainerStyle={rows.length === 0 ? styles.emptyList : undefined}
         />
       )}
     </SafeAreaView>
