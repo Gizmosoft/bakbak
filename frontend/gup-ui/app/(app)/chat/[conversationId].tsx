@@ -3,14 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type ListRenderItem,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -33,6 +33,7 @@ export default function ChatScreen() {
   const { conversationId: rawConversationId } = useLocalSearchParams<{ conversationId: string }>();
   const conversationId = Number(rawConversationId);
   const insets = useSafeAreaInsets();
+  const [composerHeight, setComposerHeight] = useState(72);
   const { user } = useAuth();
   const { data: conversations } = useConversations();
   const { getDraftText, setDraftText, getOtherUser, clearDraft, registerConversation } =
@@ -120,6 +121,10 @@ export default function ChatScreen() {
     <MessageBubble message={item} isOwnMessage={item.senderId === user?.id} />
   );
 
+  const onComposerLayout = useCallback((event: LayoutChangeEvent) => {
+    setComposerHeight(event.nativeEvent.layout.height);
+  }, []);
+
   if (!Number.isFinite(conversationId) || conversationId <= 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -127,8 +132,6 @@ export default function ChatScreen() {
       </SafeAreaView>
     );
   }
-
-  const keyboardVerticalOffset = Platform.OS === 'ios' ? insets.top + 56 : 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -144,11 +147,7 @@ export default function ChatScreen() {
 
       {chatError ? <Text style={styles.bannerError}>{chatError}</Text> : null}
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={keyboardVerticalOffset}
-      >
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
         {isLoading ? (
           <LoadingState message="Loading messages…" />
         ) : isError ? (
@@ -172,6 +171,11 @@ export default function ChatScreen() {
               minIndexForVisible: 0,
               autoscrollToTopThreshold: 24,
             }}
+            contentContainerStyle={
+              displayMessages.length === 0
+                ? styles.emptyMessages
+                : { paddingTop: composerHeight }
+            }
             ListFooterComponent={
               isFetchingNextPage ? (
                 <View style={styles.loaderFooter}>
@@ -179,7 +183,6 @@ export default function ChatScreen() {
                 </View>
               ) : null
             }
-            contentContainerStyle={displayMessages.length === 0 ? styles.emptyMessages : undefined}
             ListEmptyComponent={
               <View style={styles.invertedEmpty}>
                 <EmptyState
@@ -198,6 +201,7 @@ export default function ChatScreen() {
             onSend={handleSend}
             sendDisabled={!isConnected}
             hint={isConnected ? null : statusMessage ?? 'Connecting to chat…'}
+            onLayout={onComposerLayout}
           />
         </View>
       </KeyboardAvoidingView>

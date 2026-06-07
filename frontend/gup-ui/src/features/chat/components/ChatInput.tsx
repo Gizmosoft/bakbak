@@ -6,9 +6,12 @@ import {
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 
 import { VALIDATION } from '@/constants/validation';
+
+export const CHAT_INPUT_NATIVE_ID = 'chat-input';
 
 type ChatInputProps = {
   onSend: (content: string) => Promise<void>;
@@ -17,6 +20,7 @@ type ChatInputProps = {
   /** When true, sending is blocked but the user can still type. */
   sendDisabled?: boolean;
   hint?: string | null;
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 const { max: maxLength } = VALIDATION.message;
@@ -28,6 +32,7 @@ export function ChatInput({
   onChangeText,
   sendDisabled = false,
   hint = null,
+  onLayout,
 }: ChatInputProps) {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,11 +59,12 @@ export function ChatInput({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={onLayout}>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.row}>
         <TextInput
+          nativeID={CHAT_INPUT_NATIVE_ID}
           style={styles.input}
           value={value}
           onChangeText={onChangeText}
