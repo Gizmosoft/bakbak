@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,9 +9,13 @@ import {
   StyleSheet,
   Text,
   View,
+  type ListRenderItem,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ChatInput } from '@/features/chat/components/ChatInput';
 import { MessageBubble } from '@/features/chat/components/MessageBubble';
 import { useChatConnection } from '@/features/chat/hooks/useChatConnection';
@@ -28,6 +32,7 @@ import type { MessageResponse } from '@/types/message';
 export default function ChatScreen() {
   const { conversationId: rawConversationId } = useLocalSearchParams<{ conversationId: string }>();
   const conversationId = Number(rawConversationId);
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: conversations } = useConversations();
   const { getDraftText, setDraftText, getOtherUser, clearDraft, registerConversation } =
@@ -44,6 +49,8 @@ export default function ChatScreen() {
   } = useMessages(conversationId);
   const [chatError, setChatError] = useState<string | null>(null);
   const { isConnected, statusMessage } = useChatConnection();
+  const listRef = useRef<FlatList<MessageResponse>>(null);
+  const previousMessageCountRef = useRef(0);
 
   useChatSubscription(conversationId);
 
@@ -54,8 +61,7 @@ export default function ChatScreen() {
 
   const conversation = conversations?.find((item) => item.conversationId === conversationId);
   const otherUser = conversation?.otherUser ?? getOtherUser(conversationId);
-  const headerTitle =
-    otherUser?.displayName ?? otherUser?.username ?? 'Chat';
+  const headerTitle = otherUser?.displayName ?? otherUser?.username ?? 'Chat';
   const draftText = getDraftText(conversationId);
 
   useEffect(() => {
@@ -93,24 +99,39 @@ export default function ChatScreen() {
     [data?.pages]
   );
 
+  const displayMessages = useMemo(() => [...messages].reverse(), [messages]);
+
+  // Keep the viewport pinned to the latest message when new ones arrive.
+  useEffect(() => {
+    const previousCount = previousMessageCountRef.current;
+    if (messages.length > previousCount && previousCount > 0) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }
+    previousMessageCountRef.current = messages.length;
+  }, [messages.length]);
+
   const handleLoadOlder = () => {
     if (hasNextPage && !isFetchingNextPage) {
       void fetchNextPage();
     }
   };
 
+  const renderMessage: ListRenderItem<MessageResponse> = ({ item }) => (
+    <MessageBubble message={item} isOwnMessage={item.senderId === user?.id} />
+  );
+
   if (!Number.isFinite(conversationId) || conversationId <= 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>Invalid conversation</Text>
-        </View>
+        <ErrorState message="Invalid conversation" />
       </SafeAreaView>
     );
   }
 
+  const keyboardVerticalOffset = Platform.OS === 'ios' ? insets.top + 56 : 0;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>Back</Text>
@@ -125,33 +146,32 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={keyboardVerticalOffset}
       >
         {isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#1A1B3A" />
-          </View>
+          <LoadingState message="Loading messages…" />
         ) : isError ? (
-          <View style={styles.centered}>
-            <Text style={styles.errorText}>{error?.message ?? 'Failed to load messages'}</Text>
-            <Pressable onPress={() => refetch()}>
-              <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
-          </View>
+          <ErrorState
+            message={error?.message ?? 'Failed to load messages'}
+            onRetry={() => refetch()}
+          />
         ) : (
           <FlatList
+            ref={listRef}
             style={styles.messageList}
-            data={[...messages].reverse()}
+            data={displayMessages}
             inverted
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => (
-              <MessageBubble message={item} isOwnMessage={item.senderId === user?.id} />
-            )}
+            renderItem={renderMessage}
             onEndReached={handleLoadOlder}
             onEndReachedThreshold={0.2}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 24,
+            }}
             ListFooterComponent={
               isFetchingNextPage ? (
                 <View style={styles.loaderFooter}>
@@ -159,22 +179,27 @@ export default function ChatScreen() {
                 </View>
               ) : null
             }
-            contentContainerStyle={messages.length === 0 ? styles.emptyMessages : undefined}
+            contentContainerStyle={displayMessages.length === 0 ? styles.emptyMessages : undefined}
             ListEmptyComponent={
-              <View style={styles.emptyMessagesInner}>
-                <Text style={styles.emptyText}>No messages yet. Say hello!</Text>
+              <View style={styles.invertedEmpty}>
+                <EmptyState
+                  title="No messages yet"
+                  subtitle="Say hello to start the conversation"
+                />
               </View>
             }
           />
         )}
 
-        <ChatInput
-          value={draftText}
-          onChangeText={handleDraftChange}
-          onSend={handleSend}
-          sendDisabled={!isConnected}
-          hint={isConnected ? null : statusMessage ?? 'Connecting to chat…'}
-        />
+        <View style={{ paddingBottom: insets.bottom }}>
+          <ChatInput
+            value={draftText}
+            onChangeText={handleDraftChange}
+            onSend={handleSend}
+            sendDisabled={!isConnected}
+            hint={isConnected ? null : statusMessage ?? 'Connecting to chat…'}
+          />
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -224,33 +249,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 13,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  errorText: {
-    color: '#c62828',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  retryText: {
-    color: '#1A1B3A',
-    fontWeight: '600',
-  },
   loaderFooter: {
     paddingVertical: 12,
+    alignItems: 'center',
   },
   emptyMessages: {
     flexGrow: 1,
     justifyContent: 'center',
   },
-  emptyMessagesInner: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#666',
+  invertedEmpty: {
+    transform: [{ scaleY: -1 }],
   },
 });

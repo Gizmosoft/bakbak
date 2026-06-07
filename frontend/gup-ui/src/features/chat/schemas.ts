@@ -1,11 +1,16 @@
 import { z } from 'zod';
 
+import { VALIDATION } from '@/constants/validation';
+
 export const sendMessageSchema = z.object({
   content: z
     .string()
     .trim()
-    .min(1, 'Message cannot be empty')
-    .max(4000, 'Message must be at most 4000 characters'),
+    .min(VALIDATION.message.min, 'Message cannot be empty')
+    .max(
+      VALIDATION.message.max,
+      `Message must be at most ${VALIDATION.message.max} characters`
+    ),
 });
 
 export type SendMessageFormValues = z.infer<typeof sendMessageSchema>;

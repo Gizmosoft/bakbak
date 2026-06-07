@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormField } from '@/features/auth/components/FormField';
 import { registerSchema, type RegisterFormValues } from '@/features/auth/schemas';
 import { formatAuthError, toRegisterRequest } from '@/features/auth/utils';
+import { VALIDATION } from '@/constants/validation';
 import { useAuth } from '@/providers/AuthProvider';
 
 /** Register route (/register). Validates form, calls AuthProvider.register, then navigates home. */
@@ -73,6 +74,7 @@ export default function RegisterScreen() {
                 error={errors.username?.message}
                 autoComplete="username"
                 textContentType="username"
+                maxLength={VALIDATION.username.max}
               />
             )}
           />
@@ -90,6 +92,7 @@ export default function RegisterScreen() {
                 keyboardType="email-address"
                 autoComplete="email"
                 textContentType="emailAddress"
+                maxLength={VALIDATION.email.max}
               />
             )}
           />
@@ -107,6 +110,7 @@ export default function RegisterScreen() {
                 secureTextEntry
                 autoComplete="new-password"
                 textContentType="newPassword"
+                maxLength={VALIDATION.password.max}
               />
             )}
           />
@@ -123,6 +127,7 @@ export default function RegisterScreen() {
                 error={errors.displayName?.message}
                 autoComplete="name"
                 textContentType="name"
+                maxLength={VALIDATION.displayName.max}
               />
             )}
           />

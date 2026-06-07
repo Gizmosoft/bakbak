@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormField } from '@/features/auth/components/FormField';
 import { loginSchema, type LoginFormValues } from '@/features/auth/schemas';
 import { formatAuthError } from '@/features/auth/utils';
+import { VALIDATION } from '@/constants/validation';
 import { useAuth } from '@/providers/AuthProvider';
 
 /** Login route (/login). Validates form, calls AuthProvider.login, then navigates home. */
@@ -75,6 +76,7 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoComplete="email"
                 textContentType="emailAddress"
+                maxLength={VALIDATION.email.max}
               />
             )}
           />
@@ -92,6 +94,7 @@ export default function LoginScreen() {
                 secureTextEntry
                 autoComplete="password"
                 textContentType="password"
+                maxLength={VALIDATION.password.max}
               />
             )}
           />

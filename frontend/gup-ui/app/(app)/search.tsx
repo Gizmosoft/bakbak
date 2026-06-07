@@ -3,6 +3,8 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createOrFetchConversation } from '@/api/conversations.api';
 import { isApiError } from '@/api/errors';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { VALIDATION } from '@/constants/validation';
 import { useUserSearch } from '@/features/search/hooks/useUserSearch';
 import { getInitials } from '@/lib/format';
 import { useChatDrafts } from '@/providers/ChatDraftProvider';
@@ -24,7 +30,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
   const [startingUserId, setStartingUserId] = useState<number | null>(null);
-  const { data, isLoading, isFetching } = useUserSearch(query);
+  const { data, isLoading, isFetching, isError, error, refetch } = useUserSearch(query);
 
   const handleSelectUser = async (user: UserPublicResponse) => {
     setApiError(null);
@@ -33,83 +39,92 @@ export default function SearchScreen() {
       const conversation = await createOrFetchConversation({ targetUserId: user.id });
       registerConversation(conversation);
       router.replace(`/chat/${conversation.conversationId}` as Href);
-    } catch (error) {
-      setApiError(isApiError(error) ? error.message : 'Failed to start conversation');
+    } catch (err) {
+      setApiError(isApiError(err) ? err.message : 'Failed to start conversation');
     } finally {
       setStartingUserId(null);
     }
   };
 
-  const showLoading = query.trim().length > 0 && (isLoading || isFetching);
+  const trimmedQuery = query.trim();
+  const showLoading = trimmedQuery.length > 0 && (isLoading || isFetching);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Find people</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      <View style={styles.searchBox}>
-        <TextInput
-          style={styles.input}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search by username..."
-          placeholderTextColor="#999"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-
-      {showLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1A1B3A" />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+          <Text style={styles.title}>Find people</Text>
+          <View style={styles.headerSpacer} />
         </View>
-      ) : (
-        <FlatList
-          data={data ?? []}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => {
-            const displayName = item.displayName ?? item.username;
-            const isStarting = startingUserId === item.id;
 
-            return (
-              <Pressable
-                style={styles.resultRow}
-                onPress={() => handleSelectUser(item)}
-                disabled={isStarting}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
-                </View>
-                <View style={styles.resultContent}>
-                  <Text style={styles.displayName}>{displayName}</Text>
-                  <Text style={styles.username}>@{item.username}</Text>
-                </View>
-                {isStarting ? <ActivityIndicator color="#1A1B3A" /> : null}
-              </Pressable>
-            );
-          }}
-          ListEmptyComponent={
-            query.trim().length > 0 ? (
-              <View style={styles.centered}>
-                <Text style={styles.emptyText}>No users found</Text>
-              </View>
-            ) : (
-              <View style={styles.centered}>
-                <Text style={styles.emptyText}>Type a username to search</Text>
-              </View>
-            )
-          }
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+        <View style={styles.searchBox}>
+          <TextInput
+            style={styles.input}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by username..."
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={VALIDATION.username.max}
+          />
+        </View>
+
+        {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
+
+        {showLoading ? (
+          <LoadingState message="Searching…" />
+        ) : isError && trimmedQuery.length > 0 ? (
+          <ErrorState
+            message={error?.message ?? 'Search failed'}
+            onRetry={() => refetch()}
+          />
+        ) : (
+          <FlatList
+            data={data ?? []}
+            keyExtractor={(item) => String(item.id)}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const displayName = item.displayName ?? item.username;
+              const isStarting = startingUserId === item.id;
+
+              return (
+                <Pressable
+                  style={styles.resultRow}
+                  onPress={() => handleSelectUser(item)}
+                  disabled={isStarting}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
+                  </View>
+                  <View style={styles.resultContent}>
+                    <Text style={styles.displayName}>{displayName}</Text>
+                    <Text style={styles.username}>@{item.username}</Text>
+                  </View>
+                  {isStarting ? <ActivityIndicator color="#1A1B3A" /> : null}
+                </Pressable>
+              );
+            }}
+            ListEmptyComponent={
+              trimmedQuery.length > 0 ? (
+                <EmptyState title="No users found" subtitle="Try a different username" />
+              ) : (
+                <EmptyState
+                  title="Find someone to chat with"
+                  subtitle="Type a username to search"
+                />
+              )
+            }
+            contentContainerStyle={styles.listContent}
+          />
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -118,6 +133,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -160,12 +178,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
   listContent: {
     flexGrow: 1,
   },
@@ -202,9 +214,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 2,
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 14,
   },
 });

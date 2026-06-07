@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 
+import { VALIDATION } from '@/constants/validation';
+
 type ChatInputProps = {
   onSend: (content: string) => Promise<void>;
   value: string;
@@ -16,6 +18,9 @@ type ChatInputProps = {
   sendDisabled?: boolean;
   hint?: string | null;
 };
+
+const { max: maxLength } = VALIDATION.message;
+const SHOW_COUNTER_THRESHOLD = maxLength - 500;
 
 export function ChatInput({
   onSend,
@@ -28,6 +33,7 @@ export function ChatInput({
   const [error, setError] = useState<string | null>(null);
 
   const canSend = value.trim().length > 0 && !sendDisabled && !isSending;
+  const showCounter = value.length >= SHOW_COUNTER_THRESHOLD;
 
   const handleSend = async () => {
     const content = value.trim();
@@ -59,7 +65,7 @@ export function ChatInput({
           placeholder="Message..."
           placeholderTextColor="#999"
           multiline
-          maxLength={4000}
+          maxLength={maxLength}
           editable={!isSending}
         />
         <Pressable
@@ -74,6 +80,11 @@ export function ChatInput({
           )}
         </Pressable>
       </View>
+      {showCounter ? (
+        <Text style={[styles.counter, value.length >= maxLength && styles.counterLimit]}>
+          {value.length}/{maxLength}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -130,5 +141,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 14,
+  },
+  counter: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#888',
+    textAlign: 'right',
+  },
+  counterLimit: {
+    color: '#c62828',
   },
 });

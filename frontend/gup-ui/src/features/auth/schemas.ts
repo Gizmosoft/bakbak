@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { VALIDATION } from '@/constants/validation';
+
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 export const loginSchema = z.object({
@@ -7,31 +9,34 @@ export const loginSchema = z.object({
     .string()
     .min(1, 'Email is required')
     .email('Invalid email address')
-    .max(255, 'Email must be at most 255 characters'),
+    .max(VALIDATION.email.max, `Email must be at most ${VALIDATION.email.max} characters`),
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(100, 'Password must be at most 100 characters'),
+    .min(VALIDATION.password.min, `Password must be at least ${VALIDATION.password.min} characters`)
+    .max(VALIDATION.password.max, `Password must be at most ${VALIDATION.password.max} characters`),
 });
 
 export const registerSchema = z.object({
   username: z
     .string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(30, 'Username must be at most 30 characters')
-    .regex(/^[A-Za-z0-9_]+$/, 'Username must be alphanumeric + underscore'),
+    .min(VALIDATION.username.min, `Username must be at least ${VALIDATION.username.min} characters`)
+    .max(VALIDATION.username.max, `Username must be at most ${VALIDATION.username.max} characters`)
+    .regex(VALIDATION.username.pattern, VALIDATION.username.patternMessage),
   email: z
     .string()
     .min(1, 'Email is required')
     .email('Invalid email address')
-    .max(255, 'Email must be at most 255 characters'),
+    .max(VALIDATION.email.max, `Email must be at most ${VALIDATION.email.max} characters`),
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(100, 'Password must be at most 100 characters'),
+    .min(VALIDATION.password.min, `Password must be at least ${VALIDATION.password.min} characters`)
+    .max(VALIDATION.password.max, `Password must be at most ${VALIDATION.password.max} characters`),
   displayName: z
     .string()
-    .max(100, 'Display name must be at most 100 characters')
+    .max(
+      VALIDATION.displayName.max,
+      `Display name must be at most ${VALIDATION.displayName.max} characters`
+    )
     .optional(),
   dateOfBirth: z
     .string()

@@ -105,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Phase 7: full session teardown — STOMP, cache, SecureStore (token + drafts).
     chatClient.disconnect();
     queryClient.clear();
     await clearSession();

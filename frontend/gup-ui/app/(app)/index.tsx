@@ -1,15 +1,10 @@
 import { router, type Href } from 'expo-router';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ConversationListItem } from '@/features/conversations/components/ConversationListItem';
 import { useConversationList } from '@/features/conversations/hooks/useConversationList';
 import { useAuth } from '@/providers/AuthProvider';
@@ -42,16 +37,12 @@ export default function ConversationsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1A1B3A" />
-        </View>
+        <LoadingState message="Loading conversations…" />
       ) : isError ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error?.message ?? 'Failed to load conversations'}</Text>
-          <Pressable style={styles.retryButton} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
-        </View>
+        <ErrorState
+          message={error?.message ?? 'Failed to load conversations'}
+          onRetry={() => refetch()}
+        />
       ) : (
         <FlatList
           data={rows}
@@ -64,16 +55,12 @@ export default function ConversationsScreen() {
           )}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
           ListEmptyComponent={
-            <View style={styles.centered}>
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySubtitle}>Search for someone to start chatting</Text>
-              <Pressable
-                style={styles.primaryButton}
-                onPress={() => router.push('/search' as Href)}
-              >
-                <Text style={styles.primaryButtonText}>Find people</Text>
-              </Pressable>
-            </View>
+            <EmptyState
+              title="No conversations yet"
+              subtitle="Search for someone to start chatting"
+              actionLabel="Find people"
+              onAction={() => router.push('/search' as Href)}
+            />
           }
           contentContainerStyle={rows.length === 0 ? styles.emptyList : undefined}
         />
@@ -114,48 +101,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
   emptyList: {
     flexGrow: 1,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1B3A',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#1A1B3A',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#c62828',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  retryText: {
-    color: '#1A1B3A',
-    fontWeight: '600',
   },
 });

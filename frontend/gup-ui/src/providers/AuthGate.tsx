@@ -1,7 +1,8 @@
 import { Stack, useRouter, useSegments, type Href } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useAuth } from '@/providers/AuthProvider';
 
 /**
@@ -30,7 +31,7 @@ export function AuthGate() {
   if (isLoading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#1A1B3A" />
+        <LoadingState message="Restoring session…" />
       </View>
     );
   }
@@ -41,8 +42,6 @@ export function AuthGate() {
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#fff',
   },
 });
