@@ -12,3 +12,14 @@ export type UserPublicResponse = {
   username: string;
   displayName: string | null;
 };
+
+/** Online/offline state for a user. */
+export type PresenceStatus = 'ONLINE' | 'OFFLINE';
+
+/** Presence update broadcast on WebSocket connect/disconnect and heartbeat. */
+export type PresenceEvent = {
+  userId: number;
+  status: PresenceStatus;
+  /** ISO-8601 timestamp, e.g. 2026-04-19T14:32:00Z */
+  timestamp: string;
+};

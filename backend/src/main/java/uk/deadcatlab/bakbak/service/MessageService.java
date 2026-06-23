@@ -4,10 +4,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uk.deadcatlab.bakbak.dto.MessageType;
 import uk.deadcatlab.bakbak.dto.response.ChatMessageBroadcast;
 import uk.deadcatlab.bakbak.dto.response.MessageResponse;
 import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
@@ -70,13 +72,15 @@ public class MessageService {
 		conversationRepository.save(conversation);
 
 		MessageResponse response = toMessageResponse(saved);
+		// Server-assigned envelope id until clients send client-generated UUIDs (Phase 3).
 		ChatMessageBroadcast broadcast = new ChatMessageBroadcast(
-			response.id(),
+			UUID.randomUUID(),
 			response.conversationId(),
 			response.senderId(),
-			sender.getUsername(),
 			response.content(),
-			response.createdAt()
+			response.createdAt(),
+			response.createdAt(),
+			MessageType.CHAT
 		);
 		messagingTemplate.convertAndSend(topicDestination(conversationId), broadcast);
 		return response;

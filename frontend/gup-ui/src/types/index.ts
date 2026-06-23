@@ -7,7 +7,10 @@ export type {
 } from './conversation';
 export type {
   ChatMessageBroadcast,
+  DeliveryAck,
+  MessageEnvelope,
   MessageResponse,
+  MessageType,
   SendMessageRequest,
 } from './message';
-export type { UserPublicResponse, UserResponse } from './user';
+export type { PresenceEvent, PresenceStatus, UserPublicResponse, UserResponse } from './user';

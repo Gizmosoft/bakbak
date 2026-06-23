@@ -12,7 +12,7 @@ function broadcastToMessage(broadcast: ChatMessageBroadcast): MessageResponse {
     conversationId: broadcast.conversationId,
     senderId: broadcast.senderId,
     content: broadcast.content,
-    createdAt: broadcast.createdAt,
+    createdAt: broadcast.sentAt,
   };
 }
 
@@ -70,7 +70,7 @@ export function updateConversationPreview(
         content: broadcast.content,
         senderId: broadcast.senderId,
       },
-      lastMessageAt: broadcast.createdAt,
+      lastMessageAt: broadcast.sentAt,
     };
 
     return [updated, ...current.filter((_, itemIndex) => itemIndex !== index)];

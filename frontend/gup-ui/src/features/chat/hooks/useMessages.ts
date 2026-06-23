@@ -2,6 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { listMessages } from '@/api/messages.api';
 import { queryKeys } from '@/constants/query-keys';
+import type { MessageResponse } from '@/types/message';
 import { MESSAGE_PAGE_SIZE } from '@/websocket/cache-updates';
 
 export function useMessages(conversationId: number) {
@@ -24,7 +25,7 @@ export function useMessages(conversationId: number) {
 }
 
 export function flattenMessages(
-  pages: { id: number; createdAt: string }[][] | undefined
-): { id: number; createdAt: string }[] {
+  pages: MessageResponse[][] | undefined
+): MessageResponse[] {
   return pages?.flat() ?? [];
 }
