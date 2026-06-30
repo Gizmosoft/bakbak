@@ -353,51 +353,51 @@ Wire the new send/receive flow through the updated WebSocket protocol.
 
 ### 4.1 Idempotency on Both Ends
 
-- [ ] Backend: `OutboxService.enqueue()` must check `existsByMessageId()` before insert — prevents duplicate outbox rows if client retries a send
-- [ ] Frontend: `message.repository.insertMessage()` must use `INSERT OR IGNORE` / upsert — prevents duplicate rows if server relays a message the client already echoed
+- [x] Backend: `OutboxService.enqueue()` must check `existsByMessageId()` before insert — prevents duplicate outbox rows if client retries a send
+- [x] Frontend: `message.repository.insertMessage()` must use `INSERT OR IGNORE` / upsert — prevents duplicate rows if server relays a message the client already echoed
 
 ### 4.2 Message Expiry & Cleanup
 
-- [ ] Backend: `OutboxService.pruneExpired()` scheduled job (every hour, delete where `expires_at < now()`)
-- [ ] Frontend: No automatic purge (messages stay in SQLite forever — user owns their history)
-- [ ] Config: make outbox TTL configurable via `application.properties` (`bakbak.outbox.ttl-days=30`)
+- [x] Backend: `OutboxService.pruneExpired()` scheduled job (every hour, delete where `expires_at < now()`)
+- [x] Frontend: No automatic purge (messages stay in SQLite forever — user owns their history)
+- [x] Config: make outbox TTL configurable via `application.properties` (`bakbak.outbox.ttl-days=30`)
 
 ### 4.3 Conversation Bootstrap Gap
 
-- [ ] Handle the case where a new conversation is started on another client (edge case under single-device scope — document for now, fix if needed)
-- [ ] On `GET /api/conversations` response, upsert any conversations not already in SQLite
+- [x] Handle the case where a new conversation is started on another client (edge case under single-device scope — document for now, fix if needed)
+- [x] On `GET /api/conversations` response, upsert any conversations not already in SQLite
 
 ### 4.4 App Backgrounding / WebSocket Reconnect
 
-- [ ] Modify `frontend/gup-ui/src/providers/ChatConnectionProvider.tsx`
+- [x] Modify `frontend/gup-ui/src/providers/ChatConnectionProvider.tsx`
   - Use React Native `AppState` API to detect foreground/background transitions
   - On foreground: reconnect WebSocket if disconnected, re-run bootstrap (`GET /api/inbox/pending`)
   - On background: send STOMP DISCONNECT gracefully (so server marks offline immediately)
 
 ### 4.5 SQLite Thread Safety
 
-- [ ] All SQLite operations must run through the single `db` client instance from `DatabaseProvider`
-- [ ] Wrap concurrent writes with a queue or use WAL mode: `PRAGMA journal_mode=WAL` in `client.ts` initialization
+- [x] All SQLite operations must run through the single `db` client instance from `DatabaseProvider`
+- [x] Wrap concurrent writes with a queue or use WAL mode: `PRAGMA journal_mode=WAL` in `client.ts` initialization
 - [ ] Test on both iOS simulator and Android emulator for SQLite locking issues
 
 ### 4.6 Error Boundaries
 
-- [ ] Add error boundary around chat screen for SQLite failures (DB open failure, migration failure)
-- [ ] Fallback: show empty state with "Storage unavailable" message rather than crash
-- [ ] Log SQLite errors to console in dev mode
+- [x] Add error boundary around chat screen for SQLite failures (DB open failure, migration failure)
+- [x] Fallback: show empty state with "Storage unavailable" message rather than crash
+- [x] Log SQLite errors to console in dev mode
 
 ### 4.7 Security Audit
 
-- [ ] Backend: verify outbox rows are only accessible by the `recipient_id` user — no endpoint leaks others' pending messages
-- [ ] Backend: `GET /api/inbox/pending` must filter strictly by authenticated user's ID
-- [ ] Backend: ACK endpoint must verify the ack-ing user is the `recipient_id` on the outbox row
-- [ ] Frontend: SQLite file is stored in app sandbox (not shared storage) — verify with Expo docs for iOS/Android
+- [x] Backend: verify outbox rows are only accessible by the `recipient_id` user — no endpoint leaks others' pending messages
+- [x] Backend: `GET /api/inbox/pending` must filter strictly by authenticated user's ID
+- [x] Backend: ACK endpoint must verify the ack-ing user is the `recipient_id` on the outbox row
+- [x] Frontend: SQLite file is stored in app sandbox (not shared storage) — verify with Expo docs for iOS/Android
 
 ### 4.8 Migration Rollback Plan
 
-- [ ] Document rollback steps in `DECISIONS.md`: re-enable `MessageRepository` saves, re-enable REST history endpoint, wipe outbox table
-- [ ] Keep `messages` table in PostgreSQL until Phase 4 is complete and stable (do not run drop migration until then)
-- [ ] Create `V5__drop_messages_table.sql` but leave it un-applied until post-validation
+- [x] Document rollback steps in `DECISIONS.md`: re-enable `MessageRepository` saves, re-enable REST history endpoint, wipe outbox table
+- [x] Keep `messages` table in PostgreSQL until Phase 4 is complete and stable (do not run drop migration until then)
+- [x] Create `V5__drop_messages_table.sql` but leave it un-applied until post-validation
 
 ---
 
@@ -432,18 +432,18 @@ Wire the new send/receive flow through the updated WebSocket protocol.
 
 ## Phase 6 — Cleanup
 
-- [ ] Delete `backend/src/main/java/.../controller/MessageController.java` (confirm no remaining consumers)
-- [ ] Delete `backend/src/main/java/.../repository/MessageRepository.java`
-- [ ] Delete `backend/src/main/java/.../model/Message.java`
-- [ ] Delete `backend/src/main/java/.../dto/response/MessageResponse.java`
-- [ ] Delete `frontend/gup-ui/src/api/messages.api.ts` (if fully empty)
-- [ ] Remove `messages` table references from `ConversationService`
-- [ ] Apply `V5__drop_messages_table.sql` migration
-- [ ] Remove `useQuery` imports from `useMessages.ts` and `useConversationList.ts` (if fully removed from REST)
-- [ ] Remove `src/websocket/cache-updates.ts` (replaced by `message-sync.ts`)
-- [ ] Audit `src/constants/query-keys.ts` — remove stale keys for messages and conversations REST
-- [ ] Audit `src/constants/api-paths.ts` — remove stale paths for message history endpoint
-- [ ] Final: run full test suite, verify zero references to old `GET /api/conversations/{id}/messages`
+- [x] Delete `backend/src/main/java/.../controller/MessageController.java` (confirm no remaining consumers)
+- [x] Delete `backend/src/main/java/.../repository/MessageRepository.java`
+- [x] Delete `backend/src/main/java/.../model/Message.java`
+- [x] Delete `backend/src/main/java/.../dto/response/MessageResponse.java`
+- [x] Delete `frontend/gup-ui/src/api/messages.api.ts` (if fully empty)
+- [x] Remove `messages` table references from `ConversationService`
+- [x] Apply `V5__drop_messages_table.sql` migration
+- [x] Remove `useQuery` imports from `useMessages.ts` and `useConversationList.ts` (if fully removed from REST)
+- [x] Remove `src/websocket/cache-updates.ts` (replaced by `message-sync.ts`)
+- [x] Audit `src/constants/query-keys.ts` — remove stale keys for messages and conversations REST
+- [x] Audit `src/constants/api-paths.ts` — remove stale paths for message history endpoint
+- [x] Final: run full test suite, verify zero references to old `GET /api/conversations/{id}/messages`
 
 ---
 

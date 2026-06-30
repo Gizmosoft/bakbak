@@ -111,6 +111,17 @@ class ChatWebSocketClient {
     this.appStateSubscription?.remove();
     this.appStateSubscription = null;
 
+    this.closeSocket(false);
+    this.token = null;
+    this.setStatus(null);
+  }
+
+  /** Graceful pause when the app backgrounds — keeps token and auto-reconnect enabled. */
+  pauseForBackground(): void {
+    this.closeSocket(true);
+  }
+
+  private closeSocket(keepSession: boolean): void {
     if (this.ws) {
       try {
         if (this.connected) {
@@ -123,12 +134,14 @@ class ChatWebSocketClient {
       this.ws = null;
     }
 
-    this.token = null;
     this.sockJsOpen = false;
     this.subscribedConversations.clear();
     this.userQueuesSubscribed = false;
     this.setConnected(false);
-    this.setStatus(null);
+
+    if (!keepSession) {
+      this.shouldReconnect = false;
+    }
   }
 
   isConnected(): boolean {

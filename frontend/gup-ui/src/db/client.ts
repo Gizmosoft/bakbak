@@ -4,6 +4,7 @@ import * as SQLite from 'expo-sqlite';
 import { runMigrations } from './migrations';
 
 let dbInstance: SQLiteDatabase | null = null;
+let writeChain: Promise<void> = Promise.resolve();
 
 export async function openDatabase(): Promise<SQLiteDatabase> {
   if (dbInstance) {
@@ -24,11 +25,21 @@ export function getDatabase(): SQLiteDatabase {
   return dbInstance;
 }
 
+/** Serializes concurrent writes to avoid SQLITE_BUSY under rapid WebSocket + UI updates. */
+export function runSerialized<T>(operation: () => Promise<T>): Promise<T> {
+  const next = writeChain.then(operation);
+  writeChain = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
 export async function executeAsync(
   sql: string,
   params: SQLiteBindParams = []
 ): Promise<void> {
-  await getDatabase().runAsync(sql, params);
+  await runSerialized(() => getDatabase().runAsync(sql, params));
 }
 
 export async function getAllAsync<T>(

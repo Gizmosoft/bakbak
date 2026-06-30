@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ChatInput } from '@/features/chat/components/ChatInput';
+import { ChatErrorBoundary } from '@/features/chat/components/ChatErrorBoundary';
 import { MessageBubble } from '@/features/chat/components/MessageBubble';
 import { useChatConnection } from '@/features/chat/hooks/useChatConnection';
 import { useChatSubscription } from '@/features/chat/hooks/useChatSubscription';
@@ -153,7 +154,8 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <ChatErrorBoundary>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>Back</Text>
@@ -225,6 +227,7 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </ChatErrorBoundary>
   );
 }
 

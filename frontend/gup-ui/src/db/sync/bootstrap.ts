@@ -27,11 +27,14 @@ function pendingToBroadcast(pending: {
   };
 }
 
-/** Seeds SQLite from the server after login or session restore. */
-export async function bootstrapLocalStore(recipientUserId: number): Promise<void> {
+/** Upserts conversation metadata from the server (covers new threads started elsewhere). */
+export async function resyncConversationsFromServer(): Promise<void> {
   const conversations = await listConversations();
   await syncConversationsFromServer(conversations);
+}
 
+/** Fetches pending outbox rows for the authenticated user and persists them locally. */
+export async function resyncPendingInbox(recipientUserId: number): Promise<void> {
   const pending = await listPendingInbox();
   const ackedAt = new Date().toISOString();
 
@@ -50,4 +53,10 @@ export async function bootstrapLocalStore(recipientUserId: number): Promise<void
       ackedAt,
     });
   }
+}
+
+/** Seeds SQLite from the server after login or session restore. */
+export async function bootstrapLocalStore(recipientUserId: number): Promise<void> {
+  await resyncConversationsFromServer();
+  await resyncPendingInbox(recipientUserId);
 }

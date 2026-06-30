@@ -99,8 +99,3 @@ export function envelopeToMessage(
     status,
   };
 }
-
-/** @deprecated Use {@link MessageResponse.sentAt} — kept for gradual UI migration. */
-export function getMessageDisplayTime(message: MessageResponse): string {
-  return message.sentAt;
-}

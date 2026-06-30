@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getConversationPresence } from '@/api/presence.api';
 import * as conversationRepository from '@/db/repositories/conversation.repository';
+import { resyncConversationsFromServer } from '@/db/sync/bootstrap';
 import { queryKeys } from '@/constants/query-keys';
 import { useAuth } from '@/providers/AuthProvider';
 import { useDatabaseContext } from '@/providers/DatabaseProvider';
@@ -40,6 +41,7 @@ export function useConversations() {
   return useQuery({
     queryKey: queryKeys.conversations,
     queryFn: async () => {
+      await resyncConversationsFromServer();
       const localRows = await conversationRepository.listConversations(String(user!.id));
       const conversations = localRows.map(conversationRecordToResponse);
       return enrichWithPresence(conversations);

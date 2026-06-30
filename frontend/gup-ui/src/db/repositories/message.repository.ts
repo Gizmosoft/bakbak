@@ -33,14 +33,9 @@ export async function insertMessage(
   const message = 'clientId' in msg ? msg : envelopeToMessage(msg, status ?? 'SENT');
 
   await executeAsync(
-    `INSERT INTO messages (
+    `INSERT OR IGNORE INTO messages (
       id, conversation_id, sender_id, content, sent_at, server_received_at, status, client_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      content = excluded.content,
-      sent_at = excluded.sent_at,
-      server_received_at = excluded.server_received_at,
-      status = excluded.status`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       message.id,
       String(message.conversationId),

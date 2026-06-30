@@ -48,13 +48,35 @@ Rationale: stabilize transport, outbox, and client storage contracts first; encr
 
 ---
 
-## Rollback (reference for Phase 4)
+## ADR-005 — Conversation bootstrap gap (single-device)
+
+**Status:** Accepted  
+**Date:** 2026-06-22
+
+Under single-device scope, a conversation started on another account/device will not appear locally until the client calls `GET /api/conversations`. The app upserts server conversations into SQLite on login, on foreground resume, and whenever the conversation list is refreshed.
+
+If multi-device becomes a requirement, add a push or polling mechanism to detect new threads without a full list fetch.
+
+---
+
+## ADR-006 — Local storage security
+
+**Status:** Accepted  
+**Date:** 2026-06-22
+
+`expo-sqlite` stores `gup.db` in the **app sandbox** on iOS and Android (not shared/external storage). Message plaintext is acceptable for this migration phase per ADR-004; the file is protected by OS-level app isolation.
+
+Server-side: `GET /api/inbox/pending` filters strictly by authenticated user ID; ACK deletes only when `messageId`, `recipientId`, and `conversationId` match the outbox row.
+
+---
+
+## Rollback (reference)
 
 If the migration must be reverted before cutover:
 
-1. Re-enable `MessageRepository` persistence in `MessageService`.
-2. Re-enable `GET /api/conversations/{id}/messages` REST history.
+1. Revert `V5__drop_messages_table.sql` and restore `messages` table schema from `V1__initial_schema.sql`.
+2. Re-enable PostgreSQL message persistence in `MessageService` and REST history endpoint.
 3. Truncate or drop the server `outbox` table.
 4. Clients fall back to TanStack Query REST fetches until SQLite integration is removed.
 
-Keep the PostgreSQL `messages` table until post-validation; do not apply `V5__drop_messages_table.sql` until the new path is proven stable.
+`V5__drop_messages_table.sql` was applied after Phase 4 validation; restore from backup if rollback is needed.
