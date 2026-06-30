@@ -2,6 +2,7 @@ package uk.deadcatlab.bakbak;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Spring Boot entrypoint for the Bakbak backend.
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * {@code application-*.properties} and Flyway handles schema creation.</p>
  */
 @SpringBootApplication
+@EnableScheduling
 public class BakbakApplication {
 
 	public static void main(String[] args) {

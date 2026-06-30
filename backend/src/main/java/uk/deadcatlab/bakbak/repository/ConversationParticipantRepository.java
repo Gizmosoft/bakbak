@@ -34,6 +34,13 @@ public interface ConversationParticipantRepository
 		@Param("excludeUserId") Long excludeUserId
 	);
 
+	@Query("""
+			select cp.user.id
+			from ConversationParticipant cp
+			where cp.conversation.id = :conversationId
+			""")
+	List<Long> findUserIdsByConversationId(@Param("conversationId") Long conversationId);
+
 	/**
 	 * Projection of a conversation's "other participant" — i.e. the user who is not the requesting user.
 	 *

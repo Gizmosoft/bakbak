@@ -19,19 +19,16 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 	Optional<Conversation> findByParticipantKey(String participantKey);
 
 	/**
-	 * Returns conversations the given user participates in that have at least one message, sorted by
-	 * most-recent activity first.
+	 * Returns conversations the given user participates in, sorted by creation time descending.
 	 *
-	 * <p>Empty threads created via {@code POST /api/conversations} before anyone sends a message are
-	 * excluded so the contact window only shows real chats.</p>
+	 * <p>Message previews and {@code last_message_at} are maintained on-device in SQLite.</p>
 	 */
 	@Query("""
 			select c from Conversation c
-			where c.lastMessageAt is not null
-			and c.id in (
+			where c.id in (
 				select cp.conversation.id from ConversationParticipant cp where cp.user.id = :userId
 			)
-			order by c.lastMessageAt desc
+			order by c.createdAt desc
 			""")
 	List<Conversation> findAllForUser(@Param("userId") Long userId);
 }

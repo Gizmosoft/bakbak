@@ -1,133 +1,174 @@
 package uk.deadcatlab.bakbak.service;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uk.deadcatlab.bakbak.dto.MessageType;
 import uk.deadcatlab.bakbak.dto.response.ChatMessageBroadcast;
-import uk.deadcatlab.bakbak.dto.response.MessageResponse;
+import uk.deadcatlab.bakbak.exception.ForbiddenException;
 import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
-import uk.deadcatlab.bakbak.model.Conversation;
-import uk.deadcatlab.bakbak.model.Message;
+import uk.deadcatlab.bakbak.model.OutboxMessage;
 import uk.deadcatlab.bakbak.model.User;
+import uk.deadcatlab.bakbak.repository.ConversationParticipantRepository;
 import uk.deadcatlab.bakbak.repository.ConversationRepository;
-import uk.deadcatlab.bakbak.repository.MessageRepository;
 import uk.deadcatlab.bakbak.repository.UserRepository;
 
 /**
- * Message persistence use-cases: send (WebSocket) and history pagination (REST).
+ * Store-and-forward message relay: broadcast to online subscribers, enqueue for offline recipients.
+ *
+ * <p>Participant authorization is enforced by callers ({@link uk.deadcatlab.bakbak.websocket.WebSocketAuthorizationInterceptor}
+ * or REST controllers) before methods here run.</p>
  */
 @Service
 public class MessageService {
 
-	private static final int MIN_PAGE_SIZE = 1;
-	private static final int MAX_PAGE_SIZE = 100;
+	private static final String SENT_QUEUE = "/queue/sent";
+	private static final String INBOX_QUEUE = "/queue/inbox";
+	private static final String DELIVERY_RECEIPTS_QUEUE = "/queue/delivery-receipts";
 
-	private final MessageRepository messageRepository;
 	private final ConversationRepository conversationRepository;
+	private final ConversationParticipantRepository participantRepository;
 	private final UserRepository userRepository;
+	private final OutboxService outboxService;
+	private final PresenceService presenceService;
 	private final SimpMessagingTemplate messagingTemplate;
 
 	public MessageService(
-		MessageRepository messageRepository,
 		ConversationRepository conversationRepository,
+		ConversationParticipantRepository participantRepository,
 		UserRepository userRepository,
+		OutboxService outboxService,
+		PresenceService presenceService,
 		SimpMessagingTemplate messagingTemplate
 	) {
-		this.messageRepository = messageRepository;
 		this.conversationRepository = conversationRepository;
+		this.participantRepository = participantRepository;
 		this.userRepository = userRepository;
+		this.outboxService = outboxService;
+		this.presenceService = presenceService;
 		this.messagingTemplate = messagingTemplate;
 	}
 
 	/**
-	 * Persists a message, updates {@code conversations.last_message_at}, and broadcasts to
-	 * {@code /topic/conversation/{conversationId}}.
-	 *
-	 * <p>Transactional: one message insert + one conversation update. Authorization (participant
-	 * check) is enforced by callers before this method.</p>
+	 * Relays a chat message to online subscribers and enqueues for offline recipients. Echoes the
+	 * envelope to the sender on {@code /user/queue/sent}.
 	 */
 	@Transactional
-	public MessageResponse send(Long conversationId, Long senderId, String content) {
-		Conversation conversation = conversationRepository.findById(conversationId)
-			.orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+	public ChatMessageBroadcast send(
+		Long conversationId,
+		Long senderId,
+		UUID messageId,
+		String content
+	) {
+		if (!conversationRepository.existsById(conversationId)) {
+			throw new ResourceNotFoundException("Conversation not found");
+		}
 		User sender = userRepository.findById(senderId)
 			.orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-		Message message = new Message();
-		message.setConversation(conversation);
-		message.setSender(sender);
-		message.setContent(content);
-
-		Message saved = messageRepository.save(message);
-		Instant createdAt = saved.getCreatedAt();
-
-		conversation.setLastMessageAt(createdAt);
-		conversationRepository.save(conversation);
-
-		MessageResponse response = toMessageResponse(saved);
-		// Server-assigned envelope id until clients send client-generated UUIDs (Phase 3).
-		ChatMessageBroadcast broadcast = new ChatMessageBroadcast(
-			UUID.randomUUID(),
-			response.conversationId(),
-			response.senderId(),
-			response.content(),
-			response.createdAt(),
-			response.createdAt(),
+		UUID envelopeId = messageId != null ? messageId : UUID.randomUUID();
+		Instant now = Instant.now();
+		ChatMessageBroadcast envelope = new ChatMessageBroadcast(
+			envelopeId,
+			conversationId,
+			senderId,
+			content,
+			now,
+			now,
 			MessageType.CHAT
 		);
-		messagingTemplate.convertAndSend(topicDestination(conversationId), broadcast);
-		return response;
+
+		messagingTemplate.convertAndSend(topicDestination(conversationId), envelope);
+
+		List<Long> participants = participantRepository.findUserIdsByConversationId(conversationId);
+		for (Long recipientId : participants) {
+			if (recipientId.equals(senderId)) {
+				continue;
+			}
+			if (!presenceService.isOnline(recipientId)) {
+				outboxService.enqueue(OutboxMessage.builder()
+					.conversationId(conversationId)
+					.senderId(senderId)
+					.recipientId(recipientId)
+					.messageId(envelopeId)
+					.content(content)
+					.createdAt(now)
+					.build());
+			}
+		}
+
+		messagingTemplate.convertAndSendToUser(sender.getUsername(), SENT_QUEUE, envelope);
+		return envelope;
 	}
 
 	/**
-	 * Returns up to {@code limit} messages for {@code conversationId}, newest-first within the
-	 * selected window, then reordered to chronological ascending (oldest of the batch first).
-	 *
-	 * <p>Cursor semantics match {@code GET /api/conversations/{id}/messages}:</p>
-	 * <ul>
-	 *   <li>{@code before == null} — the {@code limit} newest messages in the conversation.</li>
-	 *   <li>{@code before != null} — the {@code limit} newest messages strictly older than
-	 *       {@code before} ({@code created_at < before}), for stable infinite scroll.</li>
-	 * </ul>
-	 *
-	 * <p>{@code limit} is clamped to 1..100; callers may also enforce defaults at the HTTP layer.</p>
-	 *
-	 * <p>Authorization (participant check) is enforced by callers — typically the REST controller
-	 * invokes {@link ConversationService#assertParticipant(Long, Long)} before this method.</p>
+	 * Deletes the outbox row after delivery ACK and optionally notifies the original sender.
+	 */
+	@Transactional
+	public void acknowledgeDelivery(UUID messageId, Long conversationId, Long recipientId, Instant ackedAt) {
+		java.util.Optional<Long> senderId = outboxService.acknowledge(messageId, recipientId);
+		if (senderId.isEmpty()) {
+			return;
+		}
+
+		User sender = userRepository.findById(senderId.get()).orElse(null);
+		if (sender == null) {
+			return;
+		}
+
+		ChatMessageBroadcast receipt = new ChatMessageBroadcast(
+			messageId,
+			conversationId,
+			recipientId,
+			"",
+			ackedAt,
+			Instant.now(),
+			MessageType.DELIVERED
+		);
+		messagingTemplate.convertAndSendToUser(sender.getUsername(), DELIVERY_RECEIPTS_QUEUE, receipt);
+	}
+
+	/**
+	 * Verifies the ACK-ing user matches {@code recipientId} before delegating to
+	 * {@link #acknowledgeDelivery}.
+	 */
+	@Transactional
+	public void acknowledgeDeliveryAsUser(
+		UUID messageId,
+		Long conversationId,
+		Long recipientId,
+		Long authenticatedUserId,
+		Instant ackedAt
+	) {
+		if (!recipientId.equals(authenticatedUserId)) {
+			throw new ForbiddenException("ACK recipient does not match authenticated user");
+		}
+		acknowledgeDelivery(messageId, conversationId, recipientId, ackedAt);
+	}
+
+	/**
+	 * Pushes pending outbox rows to {@code /user/queue/inbox} after WebSocket connect.
 	 */
 	@Transactional(readOnly = true)
-	public List<MessageResponse> getHistory(Long conversationId, Instant before, int limit) {
-		int effectiveLimit = Math.clamp(limit, MIN_PAGE_SIZE, MAX_PAGE_SIZE);
-		PageRequest page = PageRequest.of(0, effectiveLimit);
-		List<MessageResponse> newestFirst = before == null
-			? messageRepository.findNewestPage(conversationId, page)
-			: messageRepository.findHistoryPageBefore(conversationId, before, page);
-		if (newestFirst.isEmpty()) {
-			return List.of();
+	public void pushPendingInbox(Long recipientId, String username) {
+		for (OutboxMessage row : outboxService.drainForRecipient(recipientId)) {
+			ChatMessageBroadcast envelope = new ChatMessageBroadcast(
+				row.getMessageId(),
+				row.getConversationId(),
+				row.getSenderId(),
+				row.getContent(),
+				row.getCreatedAt(),
+				row.getCreatedAt(),
+				MessageType.CHAT
+			);
+			messagingTemplate.convertAndSendToUser(username, INBOX_QUEUE, envelope);
 		}
-		ArrayList<MessageResponse> chronological = new ArrayList<>(newestFirst);
-		Collections.reverse(chronological);
-		return chronological;
 	}
 
 	private static String topicDestination(Long conversationId) {
 		return "/topic/conversation/" + conversationId;
-	}
-
-	private static MessageResponse toMessageResponse(Message message) {
-		return new MessageResponse(
-			message.getId(),
-			message.getConversation().getId(),
-			message.getSender().getId(),
-			message.getContent(),
-			message.getCreatedAt()
-		);
 	}
 }

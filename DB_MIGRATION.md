@@ -54,28 +54,28 @@ Strip the server of permanent message storage. Add outbox + presence infrastruct
 
 ### 1.1 Flyway Migration — Add Outbox, Drop Messages as Primary Store
 
-- [ ] Create `V2__add_outbox.sql`
+- [x] Create `V2__add_outbox.sql`
   - New table `outbox` — columns: `id UUID PK`, `conversation_id UUID FK→conversations`, `sender_id UUID FK→users`, `recipient_id UUID FK→users`, `message_id UUID` (client-generated, for idempotency), `content TEXT NOT NULL`, `created_at TIMESTAMPTZ DEFAULT now()`, `expires_at TIMESTAMPTZ` (TTL, e.g. 30 days)
   - Index on `(recipient_id, created_at)` for efficient pull-on-connect
   - Index on `message_id` for idempotent insert check
   - File: `backend/src/main/resources/db/migration/V2__add_outbox.sql`
 
-- [ ] Create `V3__add_presence.sql`
+- [x] Create `V3__add_presence.sql`
   - New table `user_presence` — columns: `user_id UUID PK FK→users`, `status VARCHAR(10)`, `last_seen_at TIMESTAMPTZ`, `session_id VARCHAR(128)` (STOMP session ID for tie-breaking)
   - File: `backend/src/main/resources/db/migration/V3__add_presence.sql`
 
-- [ ] Create `V4__drop_messages_constraints.sql`
+- [x] Create `V4__drop_messages_constraints.sql`
   - Remove foreign key from `messages` table (keep table temporarily for migration safety, mark deprecated)
   - Do NOT drop `messages` table yet — keep for rollback window
   - File: `backend/src/main/resources/db/migration/V4__drop_messages_constraints.sql`
 
 ### 1.2 Outbox Entity & Repository
 
-- [ ] Create `backend/src/main/java/.../model/OutboxMessage.java`
+- [x] Create `backend/src/main/java/.../model/OutboxMessage.java`
   - JPA entity mapping `outbox` table
   - Lombok `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`
 
-- [ ] Create `backend/src/main/java/.../repository/OutboxMessageRepository.java`
+- [x] Create `backend/src/main/java/.../repository/OutboxMessageRepository.java`
   - Extend `JpaRepository<OutboxMessage, UUID>`
   - Custom query: `findAllByRecipientIdOrderByCreatedAtAsc(UUID recipientId)`
   - Custom query: `existsByMessageId(UUID messageId)` (idempotency check)
@@ -83,16 +83,16 @@ Strip the server of permanent message storage. Add outbox + presence infrastruct
 
 ### 1.3 Presence Entity & Repository
 
-- [ ] Create `backend/src/main/java/.../model/UserPresence.java`
+- [x] Create `backend/src/main/java/.../model/UserPresence.java`
   - JPA entity mapping `user_presence` table
 
-- [ ] Create `backend/src/main/java/.../repository/UserPresenceRepository.java`
+- [x] Create `backend/src/main/java/.../repository/UserPresenceRepository.java`
   - `findByUserId(UUID userId)`
   - `findAllByUserIdIn(List<UUID> userIds)` — for bulk presence check on conversation list
 
 ### 1.4 OutboxService
 
-- [ ] Create `backend/src/main/java/.../service/OutboxService.java`
+- [x] Create `backend/src/main/java/.../service/OutboxService.java`
   - `enqueue(OutboxMessage msg)` — idempotent insert (check `existsByMessageId` first)
   - `drainForRecipient(UUID recipientId): List<OutboxMessage>` — fetch all pending
   - `acknowledge(UUID messageId, UUID recipientId)` — delete row after ACK
@@ -100,7 +100,7 @@ Strip the server of permanent message storage. Add outbox + presence infrastruct
 
 ### 1.5 PresenceService
 
-- [ ] Create `backend/src/main/java/.../service/PresenceService.java`
+- [x] Create `backend/src/main/java/.../service/PresenceService.java`
   - `markOnline(UUID userId, String sessionId)`
   - `markOffline(UUID userId, String sessionId)`
   - `isOnline(UUID userId): boolean`
@@ -108,7 +108,7 @@ Strip the server of permanent message storage. Add outbox + presence infrastruct
 
 ### 1.6 Refactor MessageService
 
-- [ ] Modify `backend/src/main/java/.../service/MessageService.java`
+- [x] Modify `backend/src/main/java/.../service/MessageService.java`
   - Remove: `saveMessage()` (no longer persists to `messages` table)
   - Remove: `getMessages()` / pagination queries (messages now live on device)
   - Keep: participant validation logic (moved to shared helper or conversation service)
@@ -117,7 +117,7 @@ Strip the server of permanent message storage. Add outbox + presence infrastruct
 
 ### 1.7 Refactor ChatController (WebSocket)
 
-- [ ] Modify `backend/src/main/java/.../websocket/ChatController.java`
+- [x] Modify `backend/src/main/java/.../websocket/ChatController.java`
   - On `SEND /app/chat/{conversationId}`:
     1. Validate sender is participant (existing logic)
     2. Resolve all recipient user IDs for conversation
@@ -130,43 +130,43 @@ Strip the server of permanent message storage. Add outbox + presence infrastruct
     - Call `OutboxService.acknowledge(messageId, recipientId)`
     - Notify original sender via `/user/queue/delivery-receipts` (optional, for "delivered" ticks)
 
-- [ ] Add `SEND /app/presence/ping` handler — client heartbeats every 30s; update `user_presence.last_seen_at`
+- [x] Add `SEND /app/presence/ping` handler — client heartbeats every 30s; update `user_presence.last_seen_at`
 
 ### 1.8 Presence Lifecycle via WebSocket Interceptors
 
-- [ ] Modify `backend/src/main/java/.../websocket/WebSocketAuthInterceptor.java`
+- [x] Modify `backend/src/main/java/.../websocket/WebSocketAuthInterceptor.java`
   - On `CONNECT`: call `PresenceService.markOnline(userId, sessionId)` + broadcast presence event
   - On `DISCONNECT`: call `PresenceService.markOffline(userId, sessionId)` + broadcast presence event
   - Drain outbox on connect: call `OutboxService.drainForRecipient(userId)` and push each to `/user/queue/inbox`
 
 ### 1.9 Remove MessageController REST Endpoints
 
-- [ ] Modify `backend/src/main/java/.../controller/MessageController.java`
+- [x] Modify `backend/src/main/java/.../controller/MessageController.java`
   - Remove `GET /api/conversations/{id}/messages` endpoint (history now served from device SQLite)
   - Keep file but repurpose or delete — confirm no frontend dependency before removing
   - Add `GET /api/conversations/{id}/participants/presence` — returns presence map for a conversation (used by frontend to show online indicators)
 
 ### 1.10 Pending Messages REST Endpoint (Bootstrap on App Open)
 
-- [ ] Add endpoint to `ConversationController` or new `InboxController`:
+- [x] Add endpoint to `ConversationController` or new `InboxController`:
   - `GET /api/inbox/pending` — returns all outbox rows for authenticated user
   - Called once on app open before WebSocket connects (graceful fallback)
   - Payload: `List<PendingMessageResponse>` — same shape as WebSocket relay envelope
 
 ### 1.11 Update ConversationService
 
-- [ ] Modify `backend/src/main/java/.../service/ConversationService.java`
+- [x] Modify `backend/src/main/java/.../service/ConversationService.java`
   - Remove: `last_message_at` update on every message save (no longer tracked server-side)
   - Keep: get-or-create conversation, participant management, conversation listing for user
   - `listForUser()` response: strip out any embedded message previews (frontend derives from SQLite)
 
 ### 1.12 Backend Tests
 
-- [ ] Update `MessageControllerTest.java` — remove history endpoint tests; add ACK endpoint tests
-- [ ] Create `OutboxServiceTest.java` — test enqueue idempotency, drain, prune, ACK delete
-- [ ] Create `PresenceServiceTest.java` — test online/offline transitions, multi-session tie-breaking
-- [ ] Update `ChatController` WebSocket integration test — test relay path and outbox fallback path
-- [ ] Update `ConversationControllerTest.java` — remove message-preview assertions from list response
+- [x] Update `MessageControllerTest.java` — remove history endpoint tests; add ACK endpoint tests
+- [x] Create `OutboxServiceTest.java` — test enqueue idempotency, drain, prune, ACK delete
+- [x] Create `PresenceServiceTest.java` — test online/offline transitions, multi-session tie-breaking
+- [x] Update `ChatController` WebSocket integration test — test relay path and outbox fallback path
+- [x] Update `ConversationControllerTest.java` — remove message-preview assertions from list response
 
 ---
 

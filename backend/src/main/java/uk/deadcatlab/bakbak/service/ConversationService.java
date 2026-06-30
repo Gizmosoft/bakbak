@@ -11,7 +11,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import uk.deadcatlab.bakbak.dto.response.ConversationResponse;
-import uk.deadcatlab.bakbak.dto.response.ConversationResponse.LastMessagePreview;
 import uk.deadcatlab.bakbak.dto.response.UserPublicResponse;
 import uk.deadcatlab.bakbak.exception.ForbiddenException;
 import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
@@ -22,8 +21,6 @@ import uk.deadcatlab.bakbak.model.User;
 import uk.deadcatlab.bakbak.repository.ConversationParticipantRepository;
 import uk.deadcatlab.bakbak.repository.ConversationParticipantRepository.OtherParticipantView;
 import uk.deadcatlab.bakbak.repository.ConversationRepository;
-import uk.deadcatlab.bakbak.repository.MessageRepository;
-import uk.deadcatlab.bakbak.repository.MessageRepository.LastMessageView;
 import uk.deadcatlab.bakbak.repository.UserRepository;
 
 /**
@@ -43,20 +40,17 @@ public class ConversationService {
 
 	private final ConversationRepository conversationRepository;
 	private final ConversationParticipantRepository participantRepository;
-	private final MessageRepository messageRepository;
 	private final UserRepository userRepository;
 	private final TransactionTemplate transactionTemplate;
 
 	public ConversationService(
 		ConversationRepository conversationRepository,
 		ConversationParticipantRepository participantRepository,
-		MessageRepository messageRepository,
 		UserRepository userRepository,
 		PlatformTransactionManager transactionManager
 	) {
 		this.conversationRepository = conversationRepository;
 		this.participantRepository = participantRepository;
-		this.messageRepository = messageRepository;
 		this.userRepository = userRepository;
 		// Programmatic transaction so we can catch DataIntegrityViolationException OUTSIDE the
 		// failed transaction; an @Transactional method would leave us inside a rollback-only tx
@@ -87,9 +81,7 @@ public class ConversationService {
 		// Fast path: conversation already exists — most opens after the first message hit this branch.
 		Optional<Conversation> existing = conversationRepository.findByParticipantKey(key);
 		if (existing.isPresent()) {
-			return new GetOrCreateResult(
-				false,
-				toResponse(existing.get(), otherUser, fetchLastMessage(existing.get().getId())));
+			return new GetOrCreateResult(false, toResponse(existing.get(), otherUser));
 		}
 
 		try {
@@ -108,8 +100,7 @@ public class ConversationService {
 				return saved;
 			});
 
-			// Fresh conversation has no messages yet.
-			return new GetOrCreateResult(true, toResponse(created, otherUser, null));
+			return new GetOrCreateResult(true, toResponse(created, otherUser));
 		} catch (DataIntegrityViolationException raceOnUniqueKey) {
 			// Concurrent create from another request won the unique constraint — load the winner.
 			Conversation winner = conversationRepository.findByParticipantKey(key)
@@ -117,16 +108,13 @@ public class ConversationService {
 					"Unique-key violation on conversations but no row found for key " + key));
 			return new GetOrCreateResult(
 				false,
-				toResponse(winner, otherUser, fetchLastMessage(winner.getId())));
+				toResponse(winner, otherUser));
 		}
 	}
 
 	/**
-	 * Returns the contact-window listing for {@code userId}: conversations they participate in that
-	 * have at least one message, each enriched with the other participant's profile and a preview of
-	 * the latest message.
-	 *
-	 * <p>Sorted by {@code lastMessageAt DESC}. Empty threads (no messages yet) are omitted.</p>
+	 * Returns conversations the user participates in. Message previews are derived on-device from
+	 * SQLite; the server returns participant metadata only.
 	 */
 	@Transactional(readOnly = true)
 	public List<ConversationResponse> listForUser(Long userId) {
@@ -142,21 +130,15 @@ public class ConversationService {
 			.stream()
 			.collect(Collectors.toMap(OtherParticipantView::getConversationId, Function.identity()));
 
-		Map<Long, LastMessageView> lastMessageByConvId = messageRepository
-			.findLatestPerConversation(conversationIds)
-			.stream()
-			.collect(Collectors.toMap(LastMessageView::getConversationId, Function.identity()));
-
 		return conversations.stream()
 			.map(c -> {
 				OtherParticipantView other = otherByConvId.get(c.getId());
-				LastMessageView lm = lastMessageByConvId.get(c.getId());
 				return new ConversationResponse(
 					c.getId(),
 					other == null ? null : new UserPublicResponse(
 						other.getUserId(), other.getUsername(), other.getDisplayName()),
-					lm == null ? null : new LastMessagePreview(lm.getContent(), lm.getSenderId()),
-					c.getLastMessageAt()
+					null,
+					null
 				);
 			})
 			.toList();
@@ -190,6 +172,11 @@ public class ConversationService {
 		}
 	}
 
+	@Transactional(readOnly = true)
+	public List<Long> findParticipantUserIds(Long conversationId) {
+		return participantRepository.findUserIdsByConversationId(conversationId);
+	}
+
 	/**
 	 * Builds the deterministic {@code "min:max"} key used by the unique constraint on
 	 * {@code conversations.participant_key}. Order-independent so {@code (a, b)} and {@code (b, a)}
@@ -201,11 +188,6 @@ public class ConversationService {
 		return min + ":" + max;
 	}
 
-	private LastMessageView fetchLastMessage(Long conversationId) {
-		return messageRepository.findLatestPerConversation(List.of(conversationId))
-			.stream().findFirst().orElse(null);
-	}
-
 	private static ConversationParticipant newParticipant(Conversation conversation, User user) {
 		ConversationParticipant p = new ConversationParticipant();
 		p.setConversation(conversation);
@@ -214,12 +196,12 @@ public class ConversationService {
 		return p;
 	}
 
-	private static ConversationResponse toResponse(Conversation conversation, User otherUser, LastMessageView lastMessage) {
+	private static ConversationResponse toResponse(Conversation conversation, User otherUser) {
 		return new ConversationResponse(
 			conversation.getId(),
 			new UserPublicResponse(otherUser.getId(), otherUser.getUsername(), otherUser.getDisplayName()),
-			lastMessage == null ? null : new LastMessagePreview(lastMessage.getContent(), lastMessage.getSenderId()),
-			conversation.getLastMessageAt()
+			null,
+			null
 		);
 	}
 }

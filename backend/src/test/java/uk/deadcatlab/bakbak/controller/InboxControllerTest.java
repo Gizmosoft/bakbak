@@ -1,15 +1,14 @@
 package uk.deadcatlab.bakbak.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,18 +21,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import uk.deadcatlab.bakbak.config.CorsConfig;
 import uk.deadcatlab.bakbak.config.SecurityConfig;
-import uk.deadcatlab.bakbak.dto.PresenceStatus;
-import uk.deadcatlab.bakbak.exception.ForbiddenException;
 import uk.deadcatlab.bakbak.exception.GlobalExceptionHandler;
-import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
+import uk.deadcatlab.bakbak.model.OutboxMessage;
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
 import uk.deadcatlab.bakbak.security.JwtUtil;
 import uk.deadcatlab.bakbak.security.UserDetailsServiceImpl;
-import uk.deadcatlab.bakbak.service.ConversationService;
-import uk.deadcatlab.bakbak.service.PresenceService;
+import uk.deadcatlab.bakbak.service.OutboxService;
 import uk.deadcatlab.bakbak.service.UserService;
 
-@WebMvcTest(MessageController.class)
+@WebMvcTest(InboxController.class)
 @Import({
 	CorsConfig.class,
 	SecurityConfig.class,
@@ -46,12 +42,11 @@ import uk.deadcatlab.bakbak.service.UserService;
 	"jwt.secret=" + WebLayerTestSupport.TEST_JWT_SECRET,
 	"jwt.expiration-ms=3600000"
 })
-class MessageControllerTest {
+class InboxControllerTest {
 
 	@Autowired MockMvc mockMvc;
 
-	@MockitoBean ConversationService conversationService;
-	@MockitoBean PresenceService presenceService;
+	@MockitoBean OutboxService outboxService;
 	@MockitoBean UserService userService;
 	@MockitoBean UserDetailsServiceImpl userDetailsService;
 
@@ -72,47 +67,33 @@ class MessageControllerTest {
 	}
 
 	@Test
-	void participantPresence_participant_returns200() throws Exception {
-		when(conversationService.findParticipantUserIds(3L)).thenReturn(List.of(7L, 42L));
-		when(presenceService.getPresence(List.of(7L, 42L)))
-			.thenReturn(Map.of(7L, PresenceStatus.ONLINE, 42L, PresenceStatus.OFFLINE));
+	void listPending_returnsEnvelopeShape() throws Exception {
+		UUID messageId = UUID.randomUUID();
+		OutboxMessage row = OutboxMessage.builder()
+			.messageId(messageId)
+			.conversationId(5L)
+			.senderId(9L)
+			.recipientId(WebLayerTestSupport.TEST_USER_ID)
+			.content("offline hello")
+			.createdAt(Instant.parse("2026-04-19T14:32:00Z"))
+			.build();
+		when(outboxService.drainForRecipient(WebLayerTestSupport.TEST_USER_ID)).thenReturn(List.of(row));
 
-		mockMvc.perform(get("/api/conversations/3/participants/presence")
-				.header(HttpHeaders.AUTHORIZATION, authHeader))
+		mockMvc.perform(get("/api/inbox/pending").header(HttpHeaders.AUTHORIZATION, authHeader))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.7").value("ONLINE"))
-			.andExpect(jsonPath("$.42").value("OFFLINE"));
+			.andExpect(jsonPath("$.length()").value(1))
+			.andExpect(jsonPath("$[0].id").value(messageId.toString()))
+			.andExpect(jsonPath("$[0].conversationId").value(5))
+			.andExpect(jsonPath("$[0].senderId").value(9))
+			.andExpect(jsonPath("$[0].content").value("offline hello"))
+			.andExpect(jsonPath("$[0].type").value("CHAT"));
 
-		verify(conversationService).requireConversationExists(3L);
-		verify(conversationService).assertParticipant(3L, WebLayerTestSupport.TEST_USER_ID);
+		verify(outboxService).drainForRecipient(WebLayerTestSupport.TEST_USER_ID);
 	}
 
 	@Test
-	void participantPresence_notParticipant_returns403() throws Exception {
-		doThrow(new ForbiddenException("Not a participant of this conversation"))
-			.when(conversationService)
-			.assertParticipant(eq(3L), eq(WebLayerTestSupport.TEST_USER_ID));
-
-		mockMvc.perform(get("/api/conversations/3/participants/presence")
-				.header(HttpHeaders.AUTHORIZATION, authHeader))
-			.andExpect(status().isForbidden())
-			.andExpect(jsonPath("$.message").value("Not a participant of this conversation"));
-	}
-
-	@Test
-	void participantPresence_unknownConversation_returns404() throws Exception {
-		doThrow(new ResourceNotFoundException("Conversation not found"))
-			.when(conversationService)
-			.requireConversationExists(3L);
-
-		mockMvc.perform(get("/api/conversations/3/participants/presence")
-				.header(HttpHeaders.AUTHORIZATION, authHeader))
-			.andExpect(status().isNotFound());
-	}
-
-	@Test
-	void participantPresence_withoutJwt_returns401() throws Exception {
-		mockMvc.perform(get("/api/conversations/3/participants/presence"))
+	void listPending_withoutJwt_returns401() throws Exception {
+		mockMvc.perform(get("/api/inbox/pending"))
 			.andExpect(status().isUnauthorized());
 	}
 }
