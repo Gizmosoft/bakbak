@@ -2,17 +2,21 @@ package uk.deadcatlab.bakbak.controller;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import uk.deadcatlab.bakbak.dto.PresenceStatus;
 import uk.deadcatlab.bakbak.dto.request.CreateConversationRequest;
 import uk.deadcatlab.bakbak.dto.response.ConversationResponse;
 import uk.deadcatlab.bakbak.service.ConversationService;
+import uk.deadcatlab.bakbak.service.PresenceService;
 import uk.deadcatlab.bakbak.service.UserService;
 
 /**
@@ -25,10 +29,16 @@ import uk.deadcatlab.bakbak.service.UserService;
 public class ConversationController {
 
 	private final ConversationService conversationService;
+	private final PresenceService presenceService;
 	private final UserService userService;
 
-	public ConversationController(ConversationService conversationService, UserService userService) {
+	public ConversationController(
+		ConversationService conversationService,
+		PresenceService presenceService,
+		UserService userService
+	) {
 		this.conversationService = conversationService;
+		this.presenceService = presenceService;
 		this.userService = userService;
 	}
 
@@ -52,5 +62,18 @@ public class ConversationController {
 	public List<ConversationResponse> list(Authentication authentication) {
 		long userId = ControllerAuthSupport.requireCurrentUserId(authentication, userService);
 		return conversationService.listForUser(userId);
+	}
+
+	/** Presence map for all participants in a conversation (online indicators). */
+	@GetMapping("/{conversationId}/participants/presence")
+	public Map<Long, PresenceStatus> participantPresence(
+		@PathVariable Long conversationId,
+		Authentication authentication
+	) {
+		long userId = ControllerAuthSupport.requireCurrentUserId(authentication, userService);
+		conversationService.requireConversationExists(conversationId);
+		conversationService.assertParticipant(conversationId, userId);
+		List<Long> participantIds = conversationService.findParticipantUserIds(conversationId);
+		return presenceService.getPresence(participantIds);
 	}
 }

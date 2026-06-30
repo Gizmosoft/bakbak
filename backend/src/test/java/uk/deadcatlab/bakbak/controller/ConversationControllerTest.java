@@ -2,6 +2,7 @@ package uk.deadcatlab.bakbak.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +28,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 import uk.deadcatlab.bakbak.config.CorsConfig;
 import uk.deadcatlab.bakbak.config.SecurityConfig;
+import uk.deadcatlab.bakbak.dto.PresenceStatus;
 import uk.deadcatlab.bakbak.dto.request.CreateConversationRequest;
 import uk.deadcatlab.bakbak.dto.response.ConversationResponse;
 import uk.deadcatlab.bakbak.dto.response.UserPublicResponse;
+import uk.deadcatlab.bakbak.exception.ForbiddenException;
 import uk.deadcatlab.bakbak.exception.GlobalExceptionHandler;
 import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
@@ -36,6 +40,7 @@ import uk.deadcatlab.bakbak.security.JwtUtil;
 import uk.deadcatlab.bakbak.security.UserDetailsServiceImpl;
 import uk.deadcatlab.bakbak.service.ConversationService;
 import uk.deadcatlab.bakbak.service.ConversationService.GetOrCreateResult;
+import uk.deadcatlab.bakbak.service.PresenceService;
 import uk.deadcatlab.bakbak.service.UserService;
 
 /**
@@ -64,6 +69,7 @@ class ConversationControllerTest {
 	@Autowired JwtUtil jwtUtil;
 
 	@MockitoBean ConversationService conversationService;
+	@MockitoBean PresenceService presenceService;
 	@MockitoBean UserService userService;
 	@MockitoBean UserDetailsServiceImpl userDetailsService;
 
@@ -236,5 +242,52 @@ class ConversationControllerTest {
 		mockMvc.perform(get("/api/conversations"))
 			.andExpect(status().isUnauthorized());
 		verifyNoInteractions(conversationService);
+	}
+
+	// ---------- GET /api/conversations/{id}/participants/presence ----------
+
+	@Test
+	void participantPresence_participant_returns200() throws Exception {
+		when(conversationService.findParticipantUserIds(3L)).thenReturn(List.of(7L, 42L));
+		when(presenceService.getPresence(List.of(7L, 42L)))
+			.thenReturn(Map.of(7L, PresenceStatus.ONLINE, 42L, PresenceStatus.OFFLINE));
+
+		mockMvc.perform(get("/api/conversations/3/participants/presence")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + aliceToken()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.7").value("ONLINE"))
+			.andExpect(jsonPath("$.42").value("OFFLINE"));
+
+		verify(conversationService).requireConversationExists(3L);
+		verify(conversationService).assertParticipant(3L, WebLayerTestSupport.TEST_USER_ID);
+	}
+
+	@Test
+	void participantPresence_notParticipant_returns403() throws Exception {
+		doThrow(new ForbiddenException("Not a participant of this conversation"))
+			.when(conversationService)
+			.assertParticipant(eq(3L), eq(WebLayerTestSupport.TEST_USER_ID));
+
+		mockMvc.perform(get("/api/conversations/3/participants/presence")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + aliceToken()))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.message").value("Not a participant of this conversation"));
+	}
+
+	@Test
+	void participantPresence_unknownConversation_returns404() throws Exception {
+		doThrow(new ResourceNotFoundException("Conversation not found"))
+			.when(conversationService)
+			.requireConversationExists(3L);
+
+		mockMvc.perform(get("/api/conversations/3/participants/presence")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + aliceToken()))
+			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void participantPresence_withoutJwt_returns401() throws Exception {
+		mockMvc.perform(get("/api/conversations/3/participants/presence"))
+			.andExpect(status().isUnauthorized());
 	}
 }

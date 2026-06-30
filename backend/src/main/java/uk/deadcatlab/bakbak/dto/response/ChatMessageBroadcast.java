@@ -9,8 +9,7 @@ import uk.deadcatlab.bakbak.dto.MessageType;
  * {@code /user/queue/inbox}, and {@code /user/queue/sent}.
  *
  * <p>{@code id} is client-generated (UUID v4) before send; the server sets
- * {@code serverReceivedAt} on ingest. REST history ({@link MessageResponse}) remains on numeric
- * server ids until the local-first migration completes.</p>
+ * {@code serverReceivedAt} on ingest.</p>
  */
 public record ChatMessageBroadcast(
 	UUID id,

@@ -56,6 +56,7 @@ class OutboxServiceTest {
 			.createdAt(createdAt)
 			.build();
 		when(outboxRepository.existsByMessageIdAndRecipientId(messageId, 2L)).thenReturn(false);
+		when(outboxRepository.existsByMessageId(messageId)).thenReturn(false);
 
 		outboxService.enqueue(row);
 
@@ -74,17 +75,48 @@ class OutboxServiceTest {
 	}
 
 	@Test
+	void enqueue_skipsWhenMessageIdExistsGlobally() {
+		UUID messageId = UUID.randomUUID();
+		OutboxMessage row = OutboxMessage.builder()
+			.messageId(messageId)
+			.recipientId(2L)
+			.build();
+		when(outboxRepository.existsByMessageIdAndRecipientId(messageId, 2L)).thenReturn(false);
+		when(outboxRepository.existsByMessageId(messageId)).thenReturn(true);
+
+		outboxService.enqueue(row);
+
+		verify(outboxRepository, never()).save(any());
+	}
+
+	@Test
 	void acknowledge_deletesMatchingRowAndReturnsSender() {
 		UUID messageId = UUID.randomUUID();
 		OutboxMessage row = OutboxMessage.builder()
 			.messageId(messageId)
+			.conversationId(7L)
 			.recipientId(3L)
 			.senderId(9L)
 			.build();
 		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.of(row));
 
-		assertThat(outboxService.acknowledge(messageId, 3L)).contains(9L);
+		assertThat(outboxService.acknowledge(messageId, 3L, 7L)).contains(9L);
 		verify(outboxRepository).delete(row);
+	}
+
+	@Test
+	void acknowledge_wrongConversationReturnsEmpty() {
+		UUID messageId = UUID.randomUUID();
+		OutboxMessage row = OutboxMessage.builder()
+			.messageId(messageId)
+			.conversationId(7L)
+			.recipientId(3L)
+			.senderId(9L)
+			.build();
+		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.of(row));
+
+		assertThat(outboxService.acknowledge(messageId, 3L, 99L)).isEmpty();
+		verify(outboxRepository, never()).delete(any());
 	}
 
 	@Test
@@ -92,7 +124,7 @@ class OutboxServiceTest {
 		UUID messageId = UUID.randomUUID();
 		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.empty());
 
-		assertThat(outboxService.acknowledge(messageId, 3L)).isEmpty();
+		assertThat(outboxService.acknowledge(messageId, 3L, 7L)).isEmpty();
 	}
 
 	@Test

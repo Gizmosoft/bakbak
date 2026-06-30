@@ -32,11 +32,13 @@ public class OutboxService {
 	}
 
 	/**
-	 * Idempotent insert: skips when the same {@code messageId} already exists for the recipient.
+	 * Idempotent insert: skips when the same {@code messageId} already exists for the recipient
+	 * (client retry) or globally (duplicate fan-out guard).
 	 */
 	@Transactional
 	public void enqueue(OutboxMessage message) {
-		if (outboxRepository.existsByMessageIdAndRecipientId(message.getMessageId(), message.getRecipientId())) {
+		if (outboxRepository.existsByMessageIdAndRecipientId(message.getMessageId(), message.getRecipientId())
+			|| outboxRepository.existsByMessageId(message.getMessageId())) {
 			return;
 		}
 		if (message.getExpiresAt() == null) {
@@ -47,16 +49,22 @@ public class OutboxService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<OutboxMessage> drainForRecipient(Long recipientId) {
+	public List<OutboxMessage> listPendingForRecipient(Long recipientId) {
 		return outboxRepository.findAllByRecipientIdOrderByCreatedAtAsc(recipientId);
+	}
+
+	@Transactional(readOnly = true)
+	public List<OutboxMessage> drainForRecipient(Long recipientId) {
+		return listPendingForRecipient(recipientId);
 	}
 
 	/**
 	 * @return the original sender id when a row was deleted, or empty if no matching row existed
 	 */
 	@Transactional
-	public java.util.Optional<Long> acknowledge(UUID messageId, Long recipientId) {
+	public java.util.Optional<Long> acknowledge(UUID messageId, Long recipientId, Long conversationId) {
 		return outboxRepository.findByMessageIdAndRecipientId(messageId, recipientId)
+			.filter(row -> row.getConversationId().equals(conversationId))
 			.map(row -> {
 				Long senderId = row.getSenderId();
 				outboxRepository.delete(row);

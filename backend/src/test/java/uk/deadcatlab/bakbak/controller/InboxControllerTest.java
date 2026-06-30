@@ -77,7 +77,7 @@ class InboxControllerTest {
 			.content("offline hello")
 			.createdAt(Instant.parse("2026-04-19T14:32:00Z"))
 			.build();
-		when(outboxService.drainForRecipient(WebLayerTestSupport.TEST_USER_ID)).thenReturn(List.of(row));
+		when(outboxService.listPendingForRecipient(WebLayerTestSupport.TEST_USER_ID)).thenReturn(List.of(row));
 
 		mockMvc.perform(get("/api/inbox/pending").header(HttpHeaders.AUTHORIZATION, authHeader))
 			.andExpect(status().isOk())
@@ -88,7 +88,7 @@ class InboxControllerTest {
 			.andExpect(jsonPath("$[0].content").value("offline hello"))
 			.andExpect(jsonPath("$[0].type").value("CHAT"));
 
-		verify(outboxService).drainForRecipient(WebLayerTestSupport.TEST_USER_ID);
+		verify(outboxService).listPendingForRecipient(WebLayerTestSupport.TEST_USER_ID);
 	}
 
 	@Test

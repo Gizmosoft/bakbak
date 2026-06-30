@@ -14,6 +14,8 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
 
 	List<OutboxMessage> findAllByRecipientIdOrderByCreatedAtAsc(Long recipientId);
 
+	boolean existsByMessageId(UUID messageId);
+
 	boolean existsByMessageIdAndRecipientId(UUID messageId, Long recipientId);
 
 	Optional<OutboxMessage> findByMessageIdAndRecipientId(UUID messageId, Long recipientId);

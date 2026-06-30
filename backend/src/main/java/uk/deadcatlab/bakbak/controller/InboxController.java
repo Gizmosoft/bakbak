@@ -28,7 +28,7 @@ public class InboxController {
 	@GetMapping("/pending")
 	public List<PendingMessageResponse> listPending(Authentication authentication) {
 		long userId = ControllerAuthSupport.requireCurrentUserId(authentication, userService);
-		return outboxService.drainForRecipient(userId).stream()
+		return outboxService.listPendingForRecipient(userId).stream()
 			.map(InboxController::toResponse)
 			.toList();
 	}

@@ -109,7 +109,7 @@ public class MessageService {
 	 */
 	@Transactional
 	public void acknowledgeDelivery(UUID messageId, Long conversationId, Long recipientId, Instant ackedAt) {
-		java.util.Optional<Long> senderId = outboxService.acknowledge(messageId, recipientId);
+		java.util.Optional<Long> senderId = outboxService.acknowledge(messageId, recipientId, conversationId);
 		if (senderId.isEmpty()) {
 			return;
 		}

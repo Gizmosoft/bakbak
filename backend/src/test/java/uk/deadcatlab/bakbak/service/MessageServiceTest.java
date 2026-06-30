@@ -1,5 +1,6 @@
 package uk.deadcatlab.bakbak.service;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -96,7 +97,8 @@ class MessageServiceTest {
 		sender.setId(SENDER_ID);
 		sender.setUsername("alice");
 
-		when(outboxService.acknowledge(messageId, RECIPIENT_ID)).thenReturn(Optional.of(SENDER_ID));
+		when(outboxService.acknowledge(messageId, RECIPIENT_ID, CONVERSATION_ID))
+			.thenReturn(Optional.of(SENDER_ID));
 		when(userRepository.findById(SENDER_ID)).thenReturn(Optional.of(sender));
 
 		messageService.acknowledgeDelivery(
@@ -112,5 +114,18 @@ class MessageServiceTest {
 			org.mockito.ArgumentMatchers.argThat((ChatMessageBroadcast receipt) ->
 				receipt.type() == MessageType.DELIVERED && receipt.id().equals(messageId))
 		);
+	}
+
+	@Test
+	void acknowledgeDelivery_wrongRecipientThrows() {
+		assertThatThrownBy(() ->
+			messageService.acknowledgeDeliveryAsUser(
+				UUID.randomUUID(),
+				CONVERSATION_ID,
+				RECIPIENT_ID,
+				99L,
+				java.time.Instant.parse("2026-04-19T12:00:00Z")
+			)
+		).isInstanceOf(uk.deadcatlab.bakbak.exception.ForbiddenException.class);
 	}
 }
