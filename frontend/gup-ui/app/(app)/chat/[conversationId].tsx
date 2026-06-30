@@ -95,10 +95,7 @@ export default function ChatScreen() {
     [conversationId, clearDraft]
   );
 
-  const messages = useMemo(
-    () => flattenMessages(data?.pages) as MessageResponse[],
-    [data?.pages]
-  );
+  const messages = useMemo(() => flattenMessages(data?.pages), [data?.pages]);
 
   const displayMessages = useMemo(() => [...messages].reverse(), [messages]);
 

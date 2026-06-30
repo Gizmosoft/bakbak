@@ -9,14 +9,15 @@ export const API_PATHS = {
   },
   conversations: {
     list: '/api/conversations',
-    messages: (conversationId: number) =>
-      `/api/conversations/${conversationId}/messages`,
+    presence: (conversationId: number) =>
+      `/api/conversations/${conversationId}/participants/presence`,
+  },
+  inbox: {
+    pending: '/api/inbox/pending',
   },
 } as const;
 
 export const API_LIMITS = {
   searchDefault: 20,
   searchMax: 100,
-  messagesDefault: 50,
-  messagesMax: 100,
 } as const;

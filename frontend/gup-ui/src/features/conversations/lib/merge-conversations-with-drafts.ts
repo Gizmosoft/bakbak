@@ -27,6 +27,8 @@ export function mergeConversationsWithDrafts(
       otherUser: draft.otherUser,
       lastMessage: null,
       lastMessageAt: null,
+      lastMessagePreview: null,
+      otherUserPresence: 'UNKNOWN' as const,
       draftPreview: draft.draftText.trim(),
     }));
 

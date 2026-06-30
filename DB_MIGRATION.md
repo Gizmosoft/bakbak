@@ -176,27 +176,27 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.1 Install & Configure expo-sqlite
 
-- [ ] Install package: `expo install expo-sqlite`
-- [ ] Verify `expo-sqlite` is listed in `frontend/gup-ui/package.json` dependencies
-- [ ] Add `"expo-sqlite"` to `app.json` plugins array if required by SDK 54
+- [x] Install package: `expo install expo-sqlite`
+- [x] Verify `expo-sqlite` is listed in `frontend/gup-ui/package.json` dependencies
+- [x] Add `"expo-sqlite"` to `app.json` plugins array if required by SDK 54
 
 ### 2.2 SQLite Schema & Migrations
 
-- [ ] Create `frontend/gup-ui/src/db/schema.ts`
+- [x] Create `frontend/gup-ui/src/db/schema.ts`
   - Tables:
     - `conversations (id TEXT PK, participant_key TEXT, other_user_id TEXT, other_user_display_name TEXT, other_user_username TEXT, created_at TEXT, last_message_at TEXT, last_message_preview TEXT)`
     - `messages (id TEXT PK, conversation_id TEXT, sender_id TEXT, content TEXT, sent_at TEXT, server_received_at TEXT, status TEXT CHECK(status IN ('SENDING','SENT','DELIVERED','FAILED')))`
     - `outbox_pending (id TEXT PK, conversation_id TEXT, content TEXT, created_at TEXT, retry_count INTEGER DEFAULT 0)` — client-side send queue for offline sends
   - Export SQL strings for `CREATE TABLE IF NOT EXISTS` for each
 
-- [ ] Create `frontend/gup-ui/src/db/migrations.ts`
+- [x] Create `frontend/gup-ui/src/db/migrations.ts`
   - Version-gated migration runner using `PRAGMA user_version`
   - Migration 1: initial schema (conversations, messages, outbox_pending)
   - Export `runMigrations(db: SQLiteDatabase): Promise<void>`
 
 ### 2.3 Database Client
 
-- [ ] Create `frontend/gup-ui/src/db/client.ts`
+- [x] Create `frontend/gup-ui/src/db/client.ts`
   - Open database with `SQLite.openDatabaseAsync('gup.db')`
   - Run migrations on open
   - Export singleton `db` instance
@@ -204,7 +204,7 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.4 Database Provider
 
-- [ ] Create `frontend/gup-ui/src/providers/DatabaseProvider.tsx`
+- [x] Create `frontend/gup-ui/src/providers/DatabaseProvider.tsx`
   - Opens DB on mount, runs migrations
   - Exposes `db` via context (`useDatabaseContext` hook)
   - Shows loading state during DB open/migration (prevents UI flash on first install)
@@ -212,7 +212,7 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.5 Message Repository (SQLite)
 
-- [ ] Create `frontend/gup-ui/src/db/repositories/message.repository.ts`
+- [x] Create `frontend/gup-ui/src/db/repositories/message.repository.ts`
   - `insertMessage(msg: MessageEnvelope): Promise<void>` — upsert by `id` (idempotent)
   - `getMessages(conversationId: string, limit: number, beforeId?: string): Promise<Message[]>` — cursor-based pagination matching old API contract
   - `updateMessageStatus(id: string, status: MessageStatus): Promise<void>`
@@ -220,7 +220,7 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.6 Conversation Repository (SQLite)
 
-- [ ] Create `frontend/gup-ui/src/db/repositories/conversation.repository.ts`
+- [x] Create `frontend/gup-ui/src/db/repositories/conversation.repository.ts`
   - `upsertConversation(conv: ConversationRecord): Promise<void>`
   - `listConversations(userId: string): Promise<ConversationWithLastMessage[]>` — joins with messages for preview
   - `getConversation(id: string): Promise<ConversationRecord | null>`
@@ -228,7 +228,7 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.7 Client-Side Outbox Repository (SQLite)
 
-- [ ] Create `frontend/gup-ui/src/db/repositories/outbox.repository.ts`
+- [x] Create `frontend/gup-ui/src/db/repositories/outbox.repository.ts`
   - `enqueue(item: OutboxPending): Promise<void>` — write to `outbox_pending` before sending
   - `dequeue(id: string): Promise<void>` — remove after successful WebSocket delivery
   - `getPending(): Promise<OutboxPending[]>` — load on connect to retry
@@ -237,7 +237,7 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.8 Refactor `useMessages` Hook
 
-- [ ] Modify `frontend/gup-ui/src/features/chat/hooks/useMessages.ts`
+- [x] Modify `frontend/gup-ui/src/features/chat/hooks/useMessages.ts`
   - Remove: `useQuery` fetching `GET /api/conversations/{id}/messages`
   - Replace with: query SQLite `message.repository.getMessages(conversationId, limit, cursor)`
   - Return same shape (`data`, `isLoading`, `fetchNextPage`, `hasNextPage`) for zero screen-side changes
@@ -245,7 +245,7 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.9 Refactor `useConversationList` Hook
 
-- [ ] Modify `frontend/gup-ui/src/features/conversations/hooks/useConversationList.ts`
+- [x] Modify `frontend/gup-ui/src/features/conversations/hooks/useConversationList.ts`
   - Remove: `useQuery` fetching `GET /api/conversations`
   - Replace with: query SQLite `conversation.repository.listConversations(userId)`
   - Seed SQLite from server on first login (see Phase 3.1)
@@ -253,18 +253,18 @@ Replace TanStack Query REST fetches for messages with local SQLite reads/writes.
 
 ### 2.10 Remove `messages.api.ts` REST Dependency
 
-- [ ] Modify `frontend/gup-ui/src/api/messages.api.ts`
+- [x] Modify `frontend/gup-ui/src/api/messages.api.ts`
   - Remove `fetchMessages()` function (no longer used; messages come from SQLite)
   - Keep file if other exports remain; otherwise delete and remove from `src/api/index.ts`
 
 ### 2.11 Update TypeScript Types
 
-- [ ] Modify `frontend/gup-ui/src/types/message.ts`
+- [x] Modify `frontend/gup-ui/src/types/message.ts`
   - Add `status: 'SENDING' | 'SENT' | 'DELIVERED' | 'FAILED'` field
   - Add `clientId: string` field (UUID generated on client before send)
   - Rename ambiguous fields to align with SQLite schema
 
-- [ ] Modify `frontend/gup-ui/src/types/conversation.ts`
+- [x] Modify `frontend/gup-ui/src/types/conversation.ts`
   - Add `lastMessagePreview: string | null`
   - Add `lastMessageAt: string | null`
   - Add `otherUserPresence: 'ONLINE' | 'OFFLINE' | 'UNKNOWN'`

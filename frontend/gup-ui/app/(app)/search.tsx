@@ -18,10 +18,13 @@ import { isApiError } from '@/api/errors';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { queryKeys } from '@/constants/query-keys';
 import { VALIDATION } from '@/constants/validation';
+import { upsertConversationFromResponse } from '@/db/sync/conversation-sync';
 import { useUserSearch } from '@/features/search/hooks/useUserSearch';
 import { getInitials } from '@/lib/format';
 import { useChatDrafts } from '@/providers/ChatDraftProvider';
+import { queryClient } from '@/providers/QueryProvider';
 import type { UserPublicResponse } from '@/types/user';
 
 /** Search route (/search). Find users and start a 1:1 conversation. */
@@ -37,6 +40,8 @@ export default function SearchScreen() {
     setStartingUserId(user.id);
     try {
       const conversation = await createOrFetchConversation({ targetUserId: user.id });
+      await upsertConversationFromResponse(conversation);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       registerConversation(conversation);
       router.replace(`/chat/${conversation.conversationId}` as Href);
     } catch (err) {

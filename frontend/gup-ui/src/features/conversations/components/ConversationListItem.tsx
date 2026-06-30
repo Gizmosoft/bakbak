@@ -13,7 +13,9 @@ export function ConversationListItem({ conversation, onPress }: ConversationList
   const displayName = conversation.otherUser.displayName ?? conversation.otherUser.username;
   const preview = conversation.draftPreview
     ? `Draft: ${conversation.draftPreview}`
-    : conversation.lastMessage?.content ?? 'No messages yet';
+    : conversation.lastMessagePreview ??
+      conversation.lastMessage?.content ??
+      'No messages yet';
   const isDraftPreview = Boolean(conversation.draftPreview);
 
   return (

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { mergeIncomingMessage } from '@/websocket/cache-updates';
+import { persistIncomingMessage } from '@/websocket/cache-updates';
 import { chatClient } from '@/websocket/chat.client';
 
 export function useChatSubscription(conversationId: number): void {
@@ -13,7 +13,7 @@ export function useChatSubscription(conversationId: number): void {
     }
 
     return chatClient.subscribeToConversation(conversationId, (broadcast) => {
-      mergeIncomingMessage(queryClient, broadcast);
+      void persistIncomingMessage(queryClient, broadcast);
     });
   }, [conversationId, queryClient]);
 }

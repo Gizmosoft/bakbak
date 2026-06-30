@@ -16,7 +16,7 @@ export function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
           {message.content}
         </Text>
         <Text style={[styles.time, isOwnMessage ? styles.timeOwn : styles.timeOther]}>
-          {formatMessageTime(message.createdAt)}
+          {formatMessageTime(message.sentAt)}
         </Text>
       </View>
     </View>
