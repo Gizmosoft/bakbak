@@ -5,7 +5,7 @@ import { queryKeys } from '@/constants/query-keys';
 import { useDatabaseContext } from '@/providers/DatabaseProvider';
 import type { MessageResponse } from '@/types/message';
 import { messageToResponse } from '@/types/message';
-import { MESSAGE_PAGE_SIZE } from '@/websocket/cache-updates';
+import { MESSAGE_PAGE_SIZE } from '@/websocket/message-sync';
 
 export function useMessages(conversationId: number) {
   const { isReady } = useDatabaseContext();

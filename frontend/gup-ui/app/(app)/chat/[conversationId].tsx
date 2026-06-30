@@ -26,7 +26,9 @@ import { useConversations } from '@/features/conversations/hooks/useConversation
 import { useAuth } from '@/providers/AuthProvider';
 import { useChatDrafts } from '@/providers/ChatDraftProvider';
 import { chatClient } from '@/websocket/chat.client';
+import { sendOutboundMessage } from '@/websocket/message-sync';
 import type { MessageResponse } from '@/types/message';
+import { useQueryClient } from '@tanstack/react-query';
 
 /** Chat route (/chat/:conversationId). Message history + real-time send/receive. */
 export default function ChatScreen() {
@@ -35,6 +37,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [composerHeight, setComposerHeight] = useState(72);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: conversations } = useConversations();
   const { getDraftText, setDraftText, getOtherUser, clearDraft, registerConversation } =
     useChatDrafts();
@@ -88,11 +91,26 @@ export default function ChatScreen() {
         throw new Error(parsed.error.issues[0]?.message ?? 'Invalid message');
       }
 
+      if (!user) {
+        return;
+      }
+
       setChatError(null);
-      chatClient.sendMessage(conversationId, parsed.data.content);
-      clearDraft(conversationId);
+      try {
+        await sendOutboundMessage(
+          queryClient,
+          conversationId,
+          user.id,
+          parsed.data.content
+        );
+        clearDraft(conversationId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to send message';
+        setChatError(message);
+        throw err;
+      }
     },
-    [conversationId, clearDraft]
+    [conversationId, clearDraft, queryClient, user]
   );
 
   const messages = useMemo(() => flattenMessages(data?.pages), [data?.pages]);
@@ -115,7 +133,11 @@ export default function ChatScreen() {
   };
 
   const renderMessage: ListRenderItem<MessageResponse> = ({ item }) => (
-    <MessageBubble message={item} isOwnMessage={item.senderId === user?.id} />
+    <MessageBubble
+      message={item}
+      isOwnMessage={item.senderId === user?.id}
+      senderId={user?.id}
+    />
   );
 
   const onComposerLayout = useCallback((event: LayoutChangeEvent) => {

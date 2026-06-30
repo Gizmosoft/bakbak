@@ -1,24 +1,76 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatMessageTime } from '@/lib/format';
-import type { MessageResponse } from '@/types/message';
+import type { MessageResponse, MessageStatus } from '@/types/message';
+import { retryFailedMessage } from '@/websocket/message-sync';
 
 type MessageBubbleProps = {
   message: MessageResponse;
   isOwnMessage: boolean;
+  senderId?: number;
 };
 
-export function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
-  return (
-    <View style={[styles.row, isOwnMessage ? styles.rowOwn : styles.rowOther]}>
-      <View style={[styles.bubble, isOwnMessage ? styles.bubbleOwn : styles.bubbleOther]}>
-        <Text style={[styles.content, isOwnMessage ? styles.contentOwn : styles.contentOther]}>
-          {message.content}
-        </Text>
+function statusIndicator(status: MessageStatus): string {
+  switch (status) {
+    case 'SENDING':
+      return '◷';
+    case 'SENT':
+      return '✓';
+    case 'DELIVERED':
+      return '✓✓';
+    case 'FAILED':
+      return '✗';
+    default:
+      return '';
+  }
+}
+
+export function MessageBubble({ message, isOwnMessage, senderId }: MessageBubbleProps) {
+  const queryClient = useQueryClient();
+  const indicator = isOwnMessage ? statusIndicator(message.status) : '';
+  const isFailed = isOwnMessage && message.status === 'FAILED';
+
+  const handleRetry = () => {
+    if (!senderId || !isFailed) {
+      return;
+    }
+    void retryFailedMessage(queryClient, message, senderId);
+  };
+
+  const bubble = (
+    <View style={[styles.bubble, isOwnMessage ? styles.bubbleOwn : styles.bubbleOther]}>
+      <Text style={[styles.content, isOwnMessage ? styles.contentOwn : styles.contentOther]}>
+        {message.content}
+      </Text>
+      <View style={styles.metaRow}>
         <Text style={[styles.time, isOwnMessage ? styles.timeOwn : styles.timeOther]}>
           {formatMessageTime(message.sentAt)}
         </Text>
+        {indicator ? (
+          <Text
+            style={[
+              styles.status,
+              isOwnMessage ? styles.statusOwn : styles.statusOther,
+              message.status === 'FAILED' && styles.statusFailed,
+            ]}
+          >
+            {indicator}
+          </Text>
+        ) : null}
       </View>
+    </View>
+  );
+
+  return (
+    <View style={[styles.row, isOwnMessage ? styles.rowOwn : styles.rowOther]}>
+      {isFailed ? (
+        <Pressable onPress={handleRetry} accessibilityRole="button" accessibilityLabel="Retry send">
+          {bubble}
+        </Pressable>
+      ) : (
+        bubble
+      )}
     </View>
   );
 }
@@ -59,15 +111,33 @@ const styles = StyleSheet.create({
   contentOther: {
     color: '#1A1B3A',
   },
-  time: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
     marginTop: 4,
+  },
+  time: {
     fontSize: 11,
   },
   timeOwn: {
     color: 'rgba(255,255,255,0.75)',
-    textAlign: 'right',
   },
   timeOther: {
     color: '#888',
+  },
+  status: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  statusOwn: {
+    color: 'rgba(255,255,255,0.75)',
+  },
+  statusOther: {
+    color: '#888',
+  },
+  statusFailed: {
+    color: '#ff8a80',
   },
 });

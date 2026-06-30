@@ -1,7 +1,8 @@
+import * as Crypto from 'expo-crypto';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { getStompHost } from '@/config/env';
-import type { ChatMessageBroadcast } from '@/types/message';
+import type { ChatMessageBroadcast, DeliveryAck } from '@/types/message';
 import {
   buildStompFrame,
   parseIncomingPayload,
@@ -18,12 +19,22 @@ import {
 
 export type ChatMessageHandler = (message: ChatMessageBroadcast) => void;
 export type ChatErrorHandler = (message: string) => void;
+export type ConnectedHandler = () => void;
 
-type ConnectionListener = (connected: boolean) => void;
-type StatusListener = (status: string | null) => void;
+type SendLifecycleHandlers = {
+  onSentEcho?: (broadcast: ChatMessageBroadcast) => void;
+  onSendTimeout?: (clientId: string, conversationId: number) => void;
+};
+
+type UserQueueHandlers = {
+  onInbox?: ChatMessageHandler;
+  onSent?: ChatMessageHandler;
+  onDeliveryReceipt?: ChatMessageHandler;
+};
 
 const RECONNECT_DELAY_MS = 3_000;
 const CONNECT_TIMEOUT_MS = 15_000;
+const SEND_TIMEOUT_MS = 10_000;
 
 class ChatWebSocketClient {
   private ws: WebSocket | null = null;
@@ -32,16 +43,21 @@ class ChatWebSocketClient {
   private sockJsOpen = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connectTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private sendTimeoutTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private subscribedConversations = new Set<number>();
+  private userQueuesSubscribed = false;
   private messageHandlers = new Map<number, Set<ChatMessageHandler>>();
   private errorHandler: ChatErrorHandler | null = null;
+  private connectedHandler: ConnectedHandler | null = null;
+  private sendLifecycleHandlers: SendLifecycleHandlers = {};
+  private userQueueHandlers: UserQueueHandlers = {};
   private appStateSubscription: { remove: () => void } | null = null;
-  private connectionListeners = new Set<ConnectionListener>();
-  private statusListeners = new Set<StatusListener>();
+  private connectionListeners = new Set<(connected: boolean) => void>();
+  private statusListeners = new Set<(status: string | null) => void>();
   private shouldReconnect = false;
   private statusMessage: string | null = 'Connecting to chat…';
 
-  onConnectionChange(listener: ConnectionListener): () => void {
+  onConnectionChange(listener: (connected: boolean) => void): () => void {
     this.connectionListeners.add(listener);
     listener(this.connected);
     return () => {
@@ -49,12 +65,24 @@ class ChatWebSocketClient {
     };
   }
 
-  onStatusChange(listener: StatusListener): () => void {
+  onStatusChange(listener: (status: string | null) => void): () => void {
     this.statusListeners.add(listener);
     listener(this.statusMessage);
     return () => {
       this.statusListeners.delete(listener);
     };
+  }
+
+  onConnected(handler: ConnectedHandler | null): void {
+    this.connectedHandler = handler;
+  }
+
+  setSendLifecycleHandlers(handlers: SendLifecycleHandlers): void {
+    this.sendLifecycleHandlers = handlers;
+  }
+
+  setUserQueueHandlers(handlers: UserQueueHandlers): void {
+    this.userQueueHandlers = handlers;
   }
 
   getStatusMessage(): string | null {
@@ -79,6 +107,7 @@ class ChatWebSocketClient {
     this.shouldReconnect = false;
     this.clearReconnectTimer();
     this.clearConnectTimeout();
+    this.clearAllSendTimeouts();
     this.appStateSubscription?.remove();
     this.appStateSubscription = null;
 
@@ -97,6 +126,7 @@ class ChatWebSocketClient {
     this.token = null;
     this.sockJsOpen = false;
     this.subscribedConversations.clear();
+    this.userQueuesSubscribed = false;
     this.setConnected(false);
     this.setStatus(null);
   }
@@ -124,12 +154,55 @@ class ChatWebSocketClient {
     };
   }
 
-  sendMessage(conversationId: number, content: string): void {
+  async sendMessage(
+    conversationId: number,
+    _senderId: number,
+    content: string,
+    existingClientId?: string
+  ): Promise<string> {
+    const clientId = existingClientId ?? Crypto.randomUUID();
+
     if (!this.connected || !this.ws) {
       throw new Error('Chat is not connected');
     }
 
-    const body = JSON.stringify({ content });
+    this.transmitChatMessage(conversationId, clientId, content);
+    this.scheduleSendTimeout(clientId, conversationId);
+    return clientId;
+  }
+
+  sendDeliveryAck(ack: DeliveryAck): void {
+    if (!this.connected || !this.ws) {
+      return;
+    }
+
+    this.sendRaw(
+      buildStompFrame(
+        'SEND',
+        {
+          destination: '/app/ack',
+          'content-type': 'application/json',
+        },
+        JSON.stringify(ack)
+      )
+    );
+  }
+
+  sendPresencePing(): void {
+    if (!this.connected || !this.ws) {
+      return;
+    }
+
+    this.sendRaw(
+      buildStompFrame('SEND', {
+        destination: '/app/presence/ping',
+        'content-type': 'application/json',
+      })
+    );
+  }
+
+  private transmitChatMessage(conversationId: number, clientId: string, content: string): void {
+    const body = JSON.stringify({ id: clientId, content });
     this.sendRaw(
       buildStompFrame(
         'SEND',
@@ -140,6 +213,30 @@ class ChatWebSocketClient {
         body
       )
     );
+  }
+
+  private scheduleSendTimeout(clientId: string, conversationId: number): void {
+    this.clearSendTimeout(clientId);
+    const timer = setTimeout(() => {
+      this.sendTimeoutTimers.delete(clientId);
+      this.sendLifecycleHandlers.onSendTimeout?.(clientId, conversationId);
+    }, SEND_TIMEOUT_MS);
+    this.sendTimeoutTimers.set(clientId, timer);
+  }
+
+  clearSendTimeout(clientId: string): void {
+    const timer = this.sendTimeoutTimers.get(clientId);
+    if (timer) {
+      clearTimeout(timer);
+      this.sendTimeoutTimers.delete(clientId);
+    }
+  }
+
+  private clearAllSendTimeouts(): void {
+    for (const timer of this.sendTimeoutTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.sendTimeoutTimers.clear();
   }
 
   private async openSocket(token: string): Promise<void> {
@@ -157,6 +254,7 @@ class ChatWebSocketClient {
 
     this.token = token;
     this.sockJsOpen = false;
+    this.userQueuesSubscribed = false;
     this.setConnected(false);
     this.setStatus('Connecting to chat…');
 
@@ -183,6 +281,7 @@ class ChatWebSocketClient {
         this.ws = null;
         this.sockJsOpen = false;
         this.subscribedConversations.clear();
+        this.userQueuesSubscribed = false;
         this.setConnected(false);
         if (this.shouldReconnect) {
           this.setStatus('Reconnecting…');
@@ -281,6 +380,7 @@ class ChatWebSocketClient {
         this.setConnected(true);
         this.setStatus(null);
         this.resubscribeAll();
+        this.connectedHandler?.();
         return;
 
       case 'MESSAGE':
@@ -315,6 +415,26 @@ class ChatWebSocketClient {
       return;
     }
 
+    if (destination.includes('/queue/inbox')) {
+      const payload = JSON.parse(frame.body) as ChatMessageBroadcast;
+      this.userQueueHandlers.onInbox?.(payload);
+      return;
+    }
+
+    if (destination.includes('/queue/sent')) {
+      const payload = JSON.parse(frame.body) as ChatMessageBroadcast;
+      this.clearSendTimeout(payload.id);
+      this.userQueueHandlers.onSent?.(payload);
+      this.sendLifecycleHandlers.onSentEcho?.(payload);
+      return;
+    }
+
+    if (destination.includes('/queue/delivery-receipts')) {
+      const payload = JSON.parse(frame.body) as ChatMessageBroadcast;
+      this.userQueueHandlers.onDeliveryReceipt?.(payload);
+      return;
+    }
+
     const match = destination.match(/\/topic\/conversation\/(\d+)/);
     if (!match) {
       return;
@@ -339,27 +459,39 @@ class ChatWebSocketClient {
     this.subscribedConversations.add(conversationId);
   }
 
-  private subscribeToErrors(): void {
-    if (!this.connected) {
+  private subscribeToUserQueues(): void {
+    if (!this.connected || this.userQueuesSubscribed) {
       return;
     }
 
-    this.sendRaw(
-      buildStompFrame('SUBSCRIBE', {
-        id: 'sub-errors',
-        destination: '/user/queue/errors',
-      })
-    );
+    const queues = [
+      { id: 'sub-inbox', destination: '/user/queue/inbox' },
+      { id: 'sub-sent', destination: '/user/queue/sent' },
+      { id: 'sub-delivery-receipts', destination: '/user/queue/delivery-receipts' },
+      { id: 'sub-errors', destination: '/user/queue/errors' },
+    ];
+
+    for (const queue of queues) {
+      this.sendRaw(
+        buildStompFrame('SUBSCRIBE', {
+          id: queue.id,
+          destination: queue.destination,
+        })
+      );
+    }
+
+    this.userQueuesSubscribed = true;
   }
 
   private resubscribeAll(): void {
     this.subscribedConversations.clear();
+    this.userQueuesSubscribed = false;
 
     for (const conversationId of this.messageHandlers.keys()) {
       this.ensureTopicSubscription(conversationId);
     }
 
-    this.subscribeToErrors();
+    this.subscribeToUserQueues();
   }
 
   private sendRaw(frame: string): void {

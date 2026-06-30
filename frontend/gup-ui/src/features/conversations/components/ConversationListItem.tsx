@@ -17,11 +17,15 @@ export function ConversationListItem({ conversation, onPress }: ConversationList
       conversation.lastMessage?.content ??
       'No messages yet';
   const isDraftPreview = Boolean(conversation.draftPreview);
+  const isOnline = conversation.otherUserPresence === 'ONLINE';
 
   return (
     <Pressable style={styles.row} onPress={onPress}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
+      <View style={styles.avatarWrap}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
+        </View>
+        {isOnline ? <View style={styles.onlineDot} /> : null}
       </View>
       <View style={styles.content}>
         <View style={styles.topLine}>
@@ -51,6 +55,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
     backgroundColor: '#fff',
   },
+  avatarWrap: {
+    marginRight: 12,
+    position: 'relative',
+  },
   avatar: {
     width: 48,
     height: 48,
@@ -58,12 +66,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1B3A',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   avatarText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
+  },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2ecc71',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   content: {
     flex: 1,

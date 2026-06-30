@@ -7,15 +7,15 @@ import { useAuth } from '@/providers/AuthProvider';
 
 /**
  * Redirects based on session: unauthenticated users → (auth), authenticated → (app).
- * Renders a loading state while AuthProvider restores the session from secure storage.
+ * Waits for SQLite bootstrap before rendering the app stack.
  */
 export function AuthGate() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isStoreReady } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || (isAuthenticated && !isStoreReady)) {
       return;
     }
 
@@ -26,12 +26,14 @@ export function AuthGate() {
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/' as Href);
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, isStoreReady, segments, router]);
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && !isStoreReady)) {
     return (
       <View style={styles.loading}>
-        <LoadingState message="Restoring session…" />
+        <LoadingState
+          message={isLoading ? 'Restoring session…' : 'Syncing local messages…'}
+        />
       </View>
     );
   }

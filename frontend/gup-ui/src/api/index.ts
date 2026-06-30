@@ -13,5 +13,8 @@ export {
   toApiError,
 } from './errors';
 export { createOrFetchConversation, listConversations } from './conversations.api';
+export { listPendingInbox } from './inbox.api';
+export type { PendingMessageResponse } from './inbox.api';
+export { getConversationPresence } from './presence.api';
 export { getCurrentUser, searchUsers } from './users.api';
 export type { SearchUsersParams } from './users.api';

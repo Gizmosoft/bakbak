@@ -277,7 +277,7 @@ Wire the new send/receive flow through the updated WebSocket protocol.
 
 ### 3.1 Bootstrap: Seed SQLite on Login
 
-- [ ] Modify `frontend/gup-ui/src/providers/AuthProvider.tsx`
+- [x] Modify `frontend/gup-ui/src/providers/AuthProvider.tsx`
   - After successful login / token validation:
     1. Call `GET /api/conversations` → upsert each into SQLite via `conversation.repository`
     2. Call `GET /api/inbox/pending` → insert each pending message into SQLite, then send ACKs
@@ -285,7 +285,7 @@ Wire the new send/receive flow through the updated WebSocket protocol.
 
 ### 3.2 Refactor WebSocket Send Flow
 
-- [ ] Modify `frontend/gup-ui/src/websocket/chat.client.ts`
+- [x] Modify `frontend/gup-ui/src/websocket/chat.client.ts`
   - `sendMessage(conversationId, content)`:
     1. Generate `clientId = uuidv4()`
     2. Write to `outbox_pending` (SQLite) with `status = SENDING`
@@ -296,25 +296,25 @@ Wire the new send/receive flow through the updated WebSocket protocol.
        - Remove from `outbox_pending`
     6. On timeout (10s): mark `status = FAILED` in SQLite, increment retry count
 
-- [ ] Install `uuid` package: `npx expo install expo-crypto` (use `Crypto.randomUUID()` instead of third-party uuid)
+- [x] Install `uuid` package: `npx expo install expo-crypto` (use `Crypto.randomUUID()` instead of third-party uuid)
 
 ### 3.3 Refactor WebSocket Receive Flow
 
-- [ ] Modify `frontend/gup-ui/src/websocket/cache-updates.ts` → rename to `message-sync.ts`
+- [x] Modify `frontend/gup-ui/src/websocket/cache-updates.ts` → rename to `message-sync.ts`
   - On message received from `/topic/conversation/{id}` or `/user/queue/inbox`:
     1. `message.repository.insertMessage(envelope)` — idempotent upsert
     2. `conversation.repository.updateLastMessage(conversationId, preview, at)`
     3. Invalidate TanStack Query key for conversation list and message list (triggers UI re-render)
     4. Send ACK: STOMP SEND to `/app/ack` with `{ messageId, conversationId }`
 
-- [ ] Modify `frontend/gup-ui/src/features/chat/hooks/useChatSubscription.ts`
+- [x] Modify `frontend/gup-ui/src/features/chat/hooks/useChatSubscription.ts`
   - Subscribe to `/user/queue/inbox` (server-pushed pending messages on connect)
   - Subscribe to `/user/queue/sent` (echo confirming server received send)
   - Subscribe to `/user/queue/delivery-receipts` (optional: update message status to DELIVERED)
 
 ### 3.4 Offline Send Queue — Retry on Reconnect
 
-- [ ] Modify `frontend/gup-ui/src/providers/ChatConnectionProvider.tsx`
+- [x] Modify `frontend/gup-ui/src/providers/ChatConnectionProvider.tsx`
   - On STOMP `CONNECTED` event:
     1. Call `outbox.repository.getPending()` to get unsent messages
     2. Attempt to resend each via WebSocket
@@ -323,26 +323,26 @@ Wire the new send/receive flow through the updated WebSocket protocol.
 
 ### 3.5 Presence Heartbeat
 
-- [ ] Add to `frontend/gup-ui/src/providers/ChatConnectionProvider.tsx`
+- [x] Add to `frontend/gup-ui/src/providers/ChatConnectionProvider.tsx`
   - After STOMP connect, start `setInterval` sending STOMP SEND to `/app/presence/ping` every 30s
   - Clear interval on disconnect / component unmount
 
 ### 3.6 Fetch Presence for Conversation
 
-- [ ] Create `frontend/gup-ui/src/features/chat/hooks/usePresence.ts`
+- [x] Create `frontend/gup-ui/src/features/chat/hooks/usePresence.ts`
   - `usePresence(conversationId: string)` — calls `GET /api/conversations/{id}/participants/presence`
   - Returns `{ userId: string, status: 'ONLINE' | 'OFFLINE' }[]`
   - Refetch every 60s (polling fallback; real-time via presence events from WebSocket is Phase 4)
 
 ### 3.7 Update Message Bubble UI
 
-- [ ] Modify `frontend/gup-ui/src/features/chat/components/MessageBubble.tsx`
+- [x] Modify `frontend/gup-ui/src/features/chat/components/MessageBubble.tsx`
   - Add delivery status indicator: clock icon = `SENDING`, single tick = `SENT`, double tick = `DELIVERED`, red X = `FAILED`
   - Failed messages: tap to retry (re-enqueue via `chat.client.sendMessage`)
 
 ### 3.8 Update Conversation List UI
 
-- [ ] Modify `frontend/gup-ui/src/features/conversations/components/ConversationListItem.tsx`
+- [x] Modify `frontend/gup-ui/src/features/conversations/components/ConversationListItem.tsx`
   - Show `lastMessagePreview` from SQLite instead of server response
   - Show `lastMessageAt` timestamp
   - Show online indicator dot when `otherUserPresence === 'ONLINE'`
