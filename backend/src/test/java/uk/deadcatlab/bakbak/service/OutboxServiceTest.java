@@ -99,9 +99,11 @@ class OutboxServiceTest {
 			.senderId(9L)
 			.build();
 		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.of(row));
+		when(outboxRepository.deleteByMessageIdAndRecipientIdAndConversationId(messageId, 3L, 7L))
+			.thenReturn(1);
 
 		assertThat(outboxService.acknowledge(messageId, 3L, 7L)).contains(9L);
-		verify(outboxRepository).delete(row);
+		verify(outboxRepository).deleteByMessageIdAndRecipientIdAndConversationId(messageId, 3L, 7L);
 	}
 
 	@Test
@@ -116,13 +118,32 @@ class OutboxServiceTest {
 		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.of(row));
 
 		assertThat(outboxService.acknowledge(messageId, 3L, 99L)).isEmpty();
-		verify(outboxRepository, never()).delete(any());
+		verify(outboxRepository, never())
+			.deleteByMessageIdAndRecipientIdAndConversationId(any(), any(), any());
 	}
 
 	@Test
 	void acknowledge_missingRowReturnsEmpty() {
 		UUID messageId = UUID.randomUUID();
 		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.empty());
+
+		assertThat(outboxService.acknowledge(messageId, 3L, 7L)).isEmpty();
+		verify(outboxRepository, never())
+			.deleteByMessageIdAndRecipientIdAndConversationId(any(), any(), any());
+	}
+
+	@Test
+	void acknowledge_alreadyDeletedByConcurrentAckReturnsEmpty() {
+		UUID messageId = UUID.randomUUID();
+		OutboxMessage row = OutboxMessage.builder()
+			.messageId(messageId)
+			.conversationId(7L)
+			.recipientId(3L)
+			.senderId(9L)
+			.build();
+		when(outboxRepository.findByMessageIdAndRecipientId(messageId, 3L)).thenReturn(Optional.of(row));
+		when(outboxRepository.deleteByMessageIdAndRecipientIdAndConversationId(messageId, 3L, 7L))
+			.thenReturn(0);
 
 		assertThat(outboxService.acknowledge(messageId, 3L, 7L)).isEmpty();
 	}

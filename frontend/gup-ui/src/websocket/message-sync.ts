@@ -19,15 +19,35 @@ const MESSAGE_PAGE_SIZE = 50;
 const MAX_SEND_RETRIES = 5;
 
 const pendingAcks: DeliveryAck[] = [];
+/** In-session dedupe so topic + inbox + reconnect resync do not ACK the same message twice. */
+const ackedMessageIds = new Set<string>();
 
 export function queueDeliveryAck(ack: DeliveryAck): void {
+  if (ackedMessageIds.has(ack.messageId)) {
+    return;
+  }
+  if (pendingAcks.some((pending) => pending.messageId === ack.messageId)) {
+    return;
+  }
   pendingAcks.push(ack);
 }
 
 export function flushDeliveryAcks(): void {
   for (const ack of pendingAcks.splice(0)) {
+    if (ackedMessageIds.has(ack.messageId)) {
+      continue;
+    }
+    ackedMessageIds.add(ack.messageId);
     chatClient.sendDeliveryAck(ack);
   }
+}
+
+function sendDeliveryAckOnce(ack: DeliveryAck): void {
+  if (ackedMessageIds.has(ack.messageId)) {
+    return;
+  }
+  ackedMessageIds.add(ack.messageId);
+  chatClient.sendDeliveryAck(ack);
 }
 
 export async function invalidateMessageQueries(
@@ -118,7 +138,7 @@ export async function persistIncomingMessage(
   await invalidateMessageQueries(queryClient, broadcast.conversationId);
 
   if (!isOwnMessage) {
-    chatClient.sendDeliveryAck({
+    sendDeliveryAckOnce({
       messageId: broadcast.id,
       conversationId: broadcast.conversationId,
       recipientId: currentUserId,

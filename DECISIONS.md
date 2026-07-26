@@ -70,7 +70,17 @@ Server-side: `GET /api/inbox/pending` filters strictly by authenticated user ID;
 
 ---
 
-## Rollback (reference)
+## ADR-007 — Outbox until ACK (online included)
+
+**Status:** Accepted  
+**Date:** 2026-07-25
+
+Presence `ONLINE` must not mean “subscribed to `/topic/conversation/{id}`”. Clients only subscribe to a conversation topic while that chat screen is open.
+
+Therefore every recipient always gets a server outbox row until delivery ACK. Online recipients also receive an immediate push on `/user/queue/inbox` (subscribed for the whole session). The conversation topic remains an optional fast path for an open chat.
+
+Clients additionally call `GET /api/inbox/pending` after WebSocket `CONNECTED` to cover the connect-time drain race (server may push inbox before the client has subscribed).
+
 
 If the migration must be reverted before cutover:
 

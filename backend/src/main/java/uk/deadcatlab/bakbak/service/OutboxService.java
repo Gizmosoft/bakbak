@@ -59,17 +59,31 @@ public class OutboxService {
 	}
 
 	/**
-	 * @return the original sender id when a row was deleted, or empty if no matching row existed
+	 * Idempotent ACK: deletes the matching outbox row via bulk delete so concurrent ACKs
+	 * (topic + inbox, reconnect resync) do not throw {@code ObjectOptimisticLockingFailureException}.
+	 *
+	 * @return the original sender id when this call removed the row, or empty if already gone
 	 */
 	@Transactional
 	public java.util.Optional<Long> acknowledge(UUID messageId, Long recipientId, Long conversationId) {
-		return outboxRepository.findByMessageIdAndRecipientId(messageId, recipientId)
-			.filter(row -> row.getConversationId().equals(conversationId))
-			.map(row -> {
-				Long senderId = row.getSenderId();
-				outboxRepository.delete(row);
-				return senderId;
-			});
+		java.util.Optional<OutboxMessage> existing =
+			outboxRepository.findByMessageIdAndRecipientId(messageId, recipientId)
+				.filter(row -> row.getConversationId().equals(conversationId));
+		if (existing.isEmpty()) {
+			return java.util.Optional.empty();
+		}
+
+		Long senderId = existing.get().getSenderId();
+		int deleted = outboxRepository.deleteByMessageIdAndRecipientIdAndConversationId(
+			messageId,
+			recipientId,
+			conversationId
+		);
+		if (deleted == 0) {
+			// Another concurrent ACK already removed the row.
+			return java.util.Optional.empty();
+		}
+		return java.util.Optional.of(senderId);
 	}
 
 	@Scheduled(fixedRate = 3_600_000)

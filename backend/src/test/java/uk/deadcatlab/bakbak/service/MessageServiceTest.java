@@ -73,7 +73,31 @@ class MessageServiceTest {
 	}
 
 	@Test
-	void send_skipsOutboxWhenRecipientOnline() {
+	void send_enqueuesAndPushesInboxWhenRecipientOnline() {
+		User sender = new User();
+		sender.setId(SENDER_ID);
+		sender.setUsername("alice");
+		User recipient = new User();
+		recipient.setId(RECIPIENT_ID);
+		recipient.setUsername("bob");
+
+		when(conversationRepository.existsById(CONVERSATION_ID)).thenReturn(true);
+		when(userRepository.findById(SENDER_ID)).thenReturn(Optional.of(sender));
+		when(userRepository.findById(RECIPIENT_ID)).thenReturn(Optional.of(recipient));
+		when(participantRepository.findUserIdsByConversationId(CONVERSATION_ID))
+			.thenReturn(List.of(SENDER_ID, RECIPIENT_ID));
+		when(presenceService.isOnline(RECIPIENT_ID)).thenReturn(true);
+
+		messageService.send(CONVERSATION_ID, SENDER_ID, null, "hello");
+
+		verify(messagingTemplate).convertAndSend(eq("/topic/conversation/10"), any(ChatMessageBroadcast.class));
+		verify(outboxService).enqueue(any(OutboxMessage.class));
+		verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/inbox"), any(ChatMessageBroadcast.class));
+		verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/sent"), any(ChatMessageBroadcast.class));
+	}
+
+	@Test
+	void send_enqueuesWithoutInboxPushWhenRecipientOffline() {
 		User sender = new User();
 		sender.setId(SENDER_ID);
 		sender.setUsername("alice");
@@ -82,12 +106,12 @@ class MessageServiceTest {
 		when(userRepository.findById(SENDER_ID)).thenReturn(Optional.of(sender));
 		when(participantRepository.findUserIdsByConversationId(CONVERSATION_ID))
 			.thenReturn(List.of(SENDER_ID, RECIPIENT_ID));
-		when(presenceService.isOnline(RECIPIENT_ID)).thenReturn(true);
+		when(presenceService.isOnline(RECIPIENT_ID)).thenReturn(false);
 
 		messageService.send(CONVERSATION_ID, SENDER_ID, null, "hello");
 
-		verify(messagingTemplate).convertAndSend(eq("/topic/conversation/10"), any(ChatMessageBroadcast.class));
-		verify(outboxService, never()).enqueue(any(OutboxMessage.class));
+		verify(outboxService).enqueue(any(OutboxMessage.class));
+		verify(messagingTemplate, never()).convertAndSendToUser(eq("bob"), eq("/queue/inbox"), any());
 	}
 
 	@Test

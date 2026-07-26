@@ -57,7 +57,17 @@ export function ChatConnectionProvider({ children }: { children: React.ReactNode
     });
 
     chatClient.onConnected(() => {
-      flushDeliveryAcks();
+      // Safety net for connect-time inbox drain race: REST pending after user queues are subscribed.
+      void (async () => {
+        try {
+          await resyncPendingInbox(currentUserId);
+          flushDeliveryAcks();
+        } catch (error) {
+          if (__DEV__) {
+            console.error('[ChatConnectionProvider] inbox resync on connect failed', error);
+          }
+        }
+      })();
       void retryPendingOutbox(queryClient, currentUserId);
 
       if (presencePingRef.current) {

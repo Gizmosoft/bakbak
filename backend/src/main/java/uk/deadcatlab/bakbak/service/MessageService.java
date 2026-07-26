@@ -17,7 +17,12 @@ import uk.deadcatlab.bakbak.repository.ConversationRepository;
 import uk.deadcatlab.bakbak.repository.UserRepository;
 
 /**
- * Store-and-forward message relay: broadcast to online subscribers, enqueue for offline recipients.
+ * Store-and-forward message relay.
+ *
+ * <p>Every recipient gets an outbox row until delivery ACK (durable path). Online recipients also
+ * receive an immediate push on {@code /user/queue/inbox} (always subscribed while connected). The
+ * conversation topic remains a fast path for an open chat screen — presence alone must not imply
+ * topic subscription.</p>
  *
  * <p>Participant authorization is enforced by callers ({@link uk.deadcatlab.bakbak.websocket.WebSocketAuthorizationInterceptor}
  * or REST controllers) before methods here run.</p>
@@ -53,8 +58,8 @@ public class MessageService {
 	}
 
 	/**
-	 * Relays a chat message to online subscribers and enqueues for offline recipients. Echoes the
-	 * envelope to the sender on {@code /user/queue/sent}.
+	 * Relays a chat message: topic broadcast, durable outbox for each recipient, inbox push when
+	 * online, and sender echo on {@code /user/queue/sent}.
 	 */
 	@Transactional
 	public ChatMessageBroadcast send(
@@ -81,6 +86,7 @@ public class MessageService {
 			MessageType.CHAT
 		);
 
+		// Fast path for clients currently viewing this conversation.
 		messagingTemplate.convertAndSend(topicDestination(conversationId), envelope);
 
 		List<Long> participants = participantRepository.findUserIdsByConversationId(conversationId);
@@ -88,15 +94,21 @@ public class MessageService {
 			if (recipientId.equals(senderId)) {
 				continue;
 			}
-			if (!presenceService.isOnline(recipientId)) {
-				outboxService.enqueue(OutboxMessage.builder()
-					.conversationId(conversationId)
-					.senderId(senderId)
-					.recipientId(recipientId)
-					.messageId(envelopeId)
-					.content(content)
-					.createdAt(now)
-					.build());
+
+			// Durable until ACK — covers "online but not subscribed to this topic".
+			outboxService.enqueue(OutboxMessage.builder()
+				.conversationId(conversationId)
+				.senderId(senderId)
+				.recipientId(recipientId)
+				.messageId(envelopeId)
+				.content(content)
+				.createdAt(now)
+				.build());
+
+			if (presenceService.isOnline(recipientId)) {
+				userRepository.findById(recipientId).ifPresent(recipient ->
+					messagingTemplate.convertAndSendToUser(recipient.getUsername(), INBOX_QUEUE, envelope)
+				);
 			}
 		}
 
