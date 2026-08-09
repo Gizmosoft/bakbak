@@ -40,3 +40,23 @@ CREATE TABLE IF NOT EXISTS outbox_pending (
   retry_count INTEGER NOT NULL DEFAULT 0
 );
 `;
+
+export const CREATE_SIGNAL_SESSIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS signal_sessions (
+  peer_user_id TEXT PRIMARY KEY NOT NULL,
+  session_state TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`;
+
+export const CREATE_SIGNAL_IDENTITY_PEERS_TABLE = `
+CREATE TABLE IF NOT EXISTS signal_identity_peers (
+  peer_user_id TEXT PRIMARY KEY NOT NULL,
+  identity_key TEXT NOT NULL,
+  trusted_at TEXT NOT NULL
+);
+`;
+
+export const ADD_MESSAGES_ENCRYPTION_COLUMN = `
+ALTER TABLE messages ADD COLUMN encryption TEXT NOT NULL DEFAULT 'NONE';
+`;

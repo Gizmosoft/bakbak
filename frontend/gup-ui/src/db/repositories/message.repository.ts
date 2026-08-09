@@ -11,6 +11,7 @@ type MessageRow = {
   server_received_at: string | null;
   status: MessageStatus;
   client_id: string;
+  encryption?: string | null;
 };
 
 function mapRow(row: MessageRow): Message {
@@ -23,6 +24,7 @@ function mapRow(row: MessageRow): Message {
     serverReceivedAt: row.server_received_at,
     status: row.status,
     clientId: row.client_id,
+    encryption: (row.encryption as Message['encryption']) ?? 'NONE',
   };
 }
 
@@ -34,8 +36,8 @@ export async function insertMessage(
 
   await executeAsync(
     `INSERT OR IGNORE INTO messages (
-      id, conversation_id, sender_id, content, sent_at, server_received_at, status, client_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, conversation_id, sender_id, content, sent_at, server_received_at, status, client_id, encryption
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       message.id,
       String(message.conversationId),
@@ -45,6 +47,7 @@ export async function insertMessage(
       message.serverReceivedAt,
       message.status,
       message.clientId,
+      message.encryption ?? 'NONE',
     ]
   );
 }

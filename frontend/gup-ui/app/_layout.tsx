@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import '@/crypto/polyfill';
 
 import { StatusBar } from 'expo-status-bar';
 import { KeyboardProvider } from 'react-native-keyboard-controller';

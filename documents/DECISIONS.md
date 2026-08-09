@@ -39,13 +39,12 @@ Read receipts are out of scope for this migration and require a separate protoco
 
 ## ADR-004 — End-to-end encryption deferred
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-008  
 **Date:** 2026-06-22
 
-Messages are **plaintext on the wire and in SQLite** during this migration. E2E encryption will be designed and implemented **after** the local-first store-and-forward architecture is complete and validated.
+Messages were **plaintext on the wire and in SQLite** during the local-first migration. E2E was deferred until transport, outbox, and client storage contracts were stable.
 
-Rationale: stabilize transport, outbox, and client storage contracts first; encryption layers on top of a known envelope shape (`MessageEnvelope`).
-
+**Superseded:** New CHAT messages use Signal Protocol (`SIGNAL_V1`). See ADR-008 and [E2E_ENCRYPTION.md](./E2E_ENCRYPTION.md).
 ---
 
 ## ADR-005 — Conversation bootstrap gap (single-device)
@@ -61,10 +60,10 @@ If multi-device becomes a requirement, add a push or polling mechanism to detect
 
 ## ADR-006 — Local storage security
 
-**Status:** Accepted  
+**Status:** Accepted (updated 2026-08-02)  
 **Date:** 2026-06-22
 
-`expo-sqlite` stores `gup.db` in the **app sandbox** on iOS and Android (not shared/external storage). Message plaintext is acceptable for this migration phase per ADR-004; the file is protected by OS-level app isolation.
+`expo-sqlite` stores `gup.db` in the **app sandbox** on iOS and Android (not shared/external storage). After E2E (ADR-008), message bodies are stored as **plaintext after decrypt** for UX (Signal-like); ciphertext lives only on the wire and in the server outbox. Legacy `NONE` rows remain readable. Identity/prekey secrets live in SecureStore (ADR-009).
 
 Server-side: `GET /api/inbox/pending` filters strictly by authenticated user ID; ACK deletes only when `messageId`, `recipientId`, and `conversationId` match the outbox row.
 
@@ -90,3 +89,29 @@ If the migration must be reverted before cutover:
 4. Clients fall back to TanStack Query REST fetches until SQLite integration is removed.
 
 `V5__drop_messages_table.sql` was applied after Phase 4 validation; restore from backup if rollback is needed.
+
+---
+
+## ADR-008 — Signal Protocol E2EE via @noble (Expo Go)
+
+**Status:** Accepted  
+**Date:** 2026-08-02
+
+New chat bodies use the **Signal Protocol** (X3DH + Double Ratchet) implemented in TypeScript with `@noble/curves`, `@noble/ciphers`, and `@noble/hashes` so the app remains testable in **Expo Go**.
+
+- Wire/outbox: `encryption: SIGNAL_V1` and opaque ciphertext; server is a blind relay.
+- Local SQLite: plaintext **after** decrypt (legacy `NONE` rows remain readable).
+- Crypto is isolated behind `SignalProtocolService` for a possible future `libsignal` swap.
+
+Supersedes ADR-004 for new messages. Details: [E2E_ENCRYPTION.md](./E2E_ENCRYPTION.md).
+
+---
+
+## ADR-009 — Single-device SecureStore key custody
+
+**Status:** Accepted  
+**Date:** 2026-08-02
+
+Identity keys, signed-prekey secrets, and one-time prekey secrets are stored only in **`expo-secure-store`**. Ratchet/session state is in SQLite. No cloud key backup in v1.
+
+Reinstall generates a new identity and republishes prekeys; peers detect identity change via TOFU and must re-establish sessions. Encrypted backup/restore remains deferred with multi-device sync.

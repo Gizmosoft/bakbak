@@ -60,7 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const warmLocalStore = useCallback(async (currentUser: UserResponse) => {
     setIsStoreReady(false);
-    await bootstrapLocalStore(currentUser.id);
+    try {
+      await bootstrapLocalStore(currentUser.id);
+    } catch (error) {
+      console.warn('Failed to bootstrap local store / Signal keys', error);
+    }
     flushDeliveryAcks();
     queryClient.invalidateQueries();
     setIsStoreReady(true);

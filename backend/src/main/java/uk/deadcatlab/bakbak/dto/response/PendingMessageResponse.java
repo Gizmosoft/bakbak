@@ -2,6 +2,7 @@ package uk.deadcatlab.bakbak.dto.response;
 
 import java.time.Instant;
 import java.util.UUID;
+import uk.deadcatlab.bakbak.dto.EncryptionType;
 import uk.deadcatlab.bakbak.dto.MessageType;
 import uk.deadcatlab.bakbak.model.OutboxMessage;
 
@@ -15,10 +16,12 @@ public record PendingMessageResponse(
 	String content,
 	Instant sentAt,
 	Instant serverReceivedAt,
-	MessageType type
+	MessageType type,
+	EncryptionType encryption
 ) {
 
 	public static PendingMessageResponse fromOutbox(OutboxMessage row) {
+		EncryptionType encryption = row.getEncryption() != null ? row.getEncryption() : EncryptionType.NONE;
 		return new PendingMessageResponse(
 			row.getMessageId(),
 			row.getConversationId(),
@@ -26,7 +29,8 @@ public record PendingMessageResponse(
 			row.getContent(),
 			row.getCreatedAt(),
 			row.getCreatedAt(),
-			MessageType.CHAT
+			MessageType.CHAT,
+			encryption
 		);
 	}
 
@@ -38,7 +42,8 @@ public record PendingMessageResponse(
 			content,
 			sentAt,
 			serverReceivedAt,
-			type
+			type,
+			encryption
 		);
 	}
 }

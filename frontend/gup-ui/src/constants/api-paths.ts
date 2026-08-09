@@ -15,6 +15,13 @@ export const API_PATHS = {
   inbox: {
     pending: '/api/inbox/pending',
   },
+  keys: {
+    publish: '/api/keys',
+    bundle: (userId: number) => `/api/keys/bundle/${userId}`,
+    signedPreKey: '/api/keys/signed-prekey',
+    onetime: '/api/keys/onetime',
+    status: '/api/keys/status',
+  },
 } as const;
 
 export const API_LIMITS = {

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { resyncConversationsFromServer, resyncPendingInbox } from '@/db/sync/bootstrap';
+import { replenishOneTimePreKeysIfNeeded } from '@/crypto';
 import { useAuth } from '@/providers/AuthProvider';
 import { chatClient } from '@/websocket/chat.client';
 import {
@@ -60,6 +61,7 @@ export function ChatConnectionProvider({ children }: { children: React.ReactNode
       // Safety net for connect-time inbox drain race: REST pending after user queues are subscribed.
       void (async () => {
         try {
+          await replenishOneTimePreKeysIfNeeded();
           await resyncPendingInbox(currentUserId);
           flushDeliveryAcks();
         } catch (error) {
@@ -120,6 +122,7 @@ export function ChatConnectionProvider({ children }: { children: React.ReactNode
         chatClient.connect(token);
         void (async () => {
           try {
+            await replenishOneTimePreKeysIfNeeded();
             await resyncConversationsFromServer();
             await resyncPendingInbox(currentUserId);
             flushDeliveryAcks();

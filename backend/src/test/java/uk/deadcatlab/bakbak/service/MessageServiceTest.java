@@ -65,7 +65,13 @@ class MessageServiceTest {
 			.thenReturn(List.of(SENDER_ID, RECIPIENT_ID));
 		when(presenceService.isOnline(RECIPIENT_ID)).thenReturn(false);
 
-		messageService.send(CONVERSATION_ID, SENDER_ID, messageId, "hello");
+		messageService.send(
+			CONVERSATION_ID,
+			SENDER_ID,
+			messageId,
+			"hello",
+			uk.deadcatlab.bakbak.dto.EncryptionType.NONE
+		);
 
 		verify(messagingTemplate).convertAndSend(eq("/topic/conversation/10"), any(ChatMessageBroadcast.class));
 		verify(outboxService).enqueue(any(OutboxMessage.class));
@@ -88,10 +94,18 @@ class MessageServiceTest {
 			.thenReturn(List.of(SENDER_ID, RECIPIENT_ID));
 		when(presenceService.isOnline(RECIPIENT_ID)).thenReturn(true);
 
-		messageService.send(CONVERSATION_ID, SENDER_ID, null, "hello");
+		messageService.send(
+			CONVERSATION_ID,
+			SENDER_ID,
+			null,
+			"hello",
+			uk.deadcatlab.bakbak.dto.EncryptionType.SIGNAL_V1
+		);
 
 		verify(messagingTemplate).convertAndSend(eq("/topic/conversation/10"), any(ChatMessageBroadcast.class));
-		verify(outboxService).enqueue(any(OutboxMessage.class));
+		verify(outboxService).enqueue(org.mockito.ArgumentMatchers.argThat((OutboxMessage row) ->
+			row.getEncryption() == uk.deadcatlab.bakbak.dto.EncryptionType.SIGNAL_V1
+				&& "hello".equals(row.getContent())));
 		verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/inbox"), any(ChatMessageBroadcast.class));
 		verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/sent"), any(ChatMessageBroadcast.class));
 	}
@@ -108,7 +122,13 @@ class MessageServiceTest {
 			.thenReturn(List.of(SENDER_ID, RECIPIENT_ID));
 		when(presenceService.isOnline(RECIPIENT_ID)).thenReturn(false);
 
-		messageService.send(CONVERSATION_ID, SENDER_ID, null, "hello");
+		messageService.send(
+			CONVERSATION_ID,
+			SENDER_ID,
+			null,
+			"hello",
+			uk.deadcatlab.bakbak.dto.EncryptionType.NONE
+		);
 
 		verify(outboxService).enqueue(any(OutboxMessage.class));
 		verify(messagingTemplate, never()).convertAndSendToUser(eq("bob"), eq("/queue/inbox"), any());

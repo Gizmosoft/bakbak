@@ -86,7 +86,8 @@ class InboxControllerTest {
 			.andExpect(jsonPath("$[0].conversationId").value(5))
 			.andExpect(jsonPath("$[0].senderId").value(9))
 			.andExpect(jsonPath("$[0].content").value("offline hello"))
-			.andExpect(jsonPath("$[0].type").value("CHAT"));
+			.andExpect(jsonPath("$[0].type").value("CHAT"))
+			.andExpect(jsonPath("$[0].encryption").value("NONE"));
 
 		verify(outboxService).listPendingForRecipient(WebLayerTestSupport.TEST_USER_ID);
 	}

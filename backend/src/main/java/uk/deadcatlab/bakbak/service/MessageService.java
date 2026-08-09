@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uk.deadcatlab.bakbak.dto.EncryptionType;
 import uk.deadcatlab.bakbak.dto.MessageType;
 import uk.deadcatlab.bakbak.dto.response.ChatMessageBroadcast;
 import uk.deadcatlab.bakbak.exception.ForbiddenException;
@@ -23,6 +24,9 @@ import uk.deadcatlab.bakbak.repository.UserRepository;
  * receive an immediate push on {@code /user/queue/inbox} (always subscribed while connected). The
  * conversation topic remains a fast path for an open chat screen — presence alone must not imply
  * topic subscription.</p>
+ *
+ * <p>{@code content} is treated as opaque (plaintext legacy or Signal ciphertext). The server never
+ * decrypts chat bodies.</p>
  *
  * <p>Participant authorization is enforced by callers ({@link uk.deadcatlab.bakbak.websocket.WebSocketAuthorizationInterceptor}
  * or REST controllers) before methods here run.</p>
@@ -66,7 +70,8 @@ public class MessageService {
 		Long conversationId,
 		Long senderId,
 		UUID messageId,
-		String content
+		String content,
+		EncryptionType encryption
 	) {
 		if (!conversationRepository.existsById(conversationId)) {
 			throw new ResourceNotFoundException("Conversation not found");
@@ -74,6 +79,7 @@ public class MessageService {
 		User sender = userRepository.findById(senderId)
 			.orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+		EncryptionType effectiveEncryption = encryption != null ? encryption : EncryptionType.NONE;
 		UUID envelopeId = messageId != null ? messageId : UUID.randomUUID();
 		Instant now = Instant.now();
 		ChatMessageBroadcast envelope = new ChatMessageBroadcast(
@@ -83,7 +89,8 @@ public class MessageService {
 			content,
 			now,
 			now,
-			MessageType.CHAT
+			MessageType.CHAT,
+			effectiveEncryption
 		);
 
 		// Fast path for clients currently viewing this conversation.
@@ -102,6 +109,7 @@ public class MessageService {
 				.recipientId(recipientId)
 				.messageId(envelopeId)
 				.content(content)
+				.encryption(effectiveEncryption)
 				.createdAt(now)
 				.build());
 
@@ -138,7 +146,8 @@ public class MessageService {
 			"",
 			ackedAt,
 			Instant.now(),
-			MessageType.DELIVERED
+			MessageType.DELIVERED,
+			EncryptionType.NONE
 		);
 		messagingTemplate.convertAndSendToUser(sender.getUsername(), DELIVERY_RECEIPTS_QUEUE, receipt);
 	}
@@ -167,6 +176,7 @@ public class MessageService {
 	@Transactional(readOnly = true)
 	public void pushPendingInbox(Long recipientId, String username) {
 		for (OutboxMessage row : outboxService.drainForRecipient(recipientId)) {
+			EncryptionType encryption = row.getEncryption() != null ? row.getEncryption() : EncryptionType.NONE;
 			ChatMessageBroadcast envelope = new ChatMessageBroadcast(
 				row.getMessageId(),
 				row.getConversationId(),
@@ -174,7 +184,8 @@ public class MessageService {
 				row.getContent(),
 				row.getCreatedAt(),
 				row.getCreatedAt(),
-				MessageType.CHAT
+				MessageType.CHAT,
+				encryption
 			);
 			messagingTemplate.convertAndSendToUser(username, INBOX_QUEUE, envelope);
 		}

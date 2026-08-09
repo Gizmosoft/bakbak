@@ -2,6 +2,8 @@ package uk.deadcatlab.bakbak.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -11,6 +13,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import uk.deadcatlab.bakbak.dto.EncryptionType;
 
 /**
  * Temporary server-side row for offline message delivery.
@@ -44,6 +47,11 @@ public class OutboxMessage {
 	@Column(nullable = false, columnDefinition = "TEXT")
 	private String content;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 16)
+	@Builder.Default
+	private EncryptionType encryption = EncryptionType.NONE;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
@@ -57,6 +65,9 @@ public class OutboxMessage {
 		}
 		if (createdAt == null) {
 			createdAt = Instant.now();
+		}
+		if (encryption == null) {
+			encryption = EncryptionType.NONE;
 		}
 	}
 }

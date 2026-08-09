@@ -1,10 +1,11 @@
 import { listConversations } from '@/api/conversations.api';
 import { listPendingInbox } from '@/api/inbox.api';
+import { decryptFromPeer, ensureKeysPublished } from '@/crypto';
 import * as conversationRepository from '@/db/repositories/conversation.repository';
 import * as messageRepository from '@/db/repositories/message.repository';
 import { syncConversationsFromServer } from '@/db/sync/conversation-sync';
 import { queueDeliveryAck } from '@/websocket/message-sync';
-import type { ChatMessageBroadcast } from '@/types/message';
+import type { ChatMessageBroadcast, EncryptionType } from '@/types/message';
 import { envelopeToMessage } from '@/types/message';
 
 function pendingToBroadcast(pending: {
@@ -15,6 +16,7 @@ function pendingToBroadcast(pending: {
   sentAt: string;
   serverReceivedAt: string | null;
   type: ChatMessageBroadcast['type'];
+  encryption?: EncryptionType;
 }): ChatMessageBroadcast {
   return {
     id: pending.id,
@@ -24,6 +26,7 @@ function pendingToBroadcast(pending: {
     sentAt: pending.sentAt,
     serverReceivedAt: pending.serverReceivedAt,
     type: pending.type,
+    encryption: pending.encryption ?? 'NONE',
   };
 }
 
@@ -40,10 +43,25 @@ export async function resyncPendingInbox(recipientUserId: number): Promise<void>
 
   for (const item of pending) {
     const broadcast = pendingToBroadcast(item);
-    await messageRepository.insertMessage(envelopeToMessage(broadcast, 'SENT'));
+    let plaintext = broadcast.content;
+    if ((broadcast.encryption ?? 'NONE') === 'SIGNAL_V1') {
+      try {
+        plaintext = await decryptFromPeer(broadcast.senderId, broadcast.content);
+      } catch (error) {
+        console.warn('Failed to decrypt pending inbox message', broadcast.id, error);
+        plaintext = '[Unable to decrypt message]';
+      }
+    }
+
+    await messageRepository.insertMessage(
+      envelopeToMessage(
+        { ...broadcast, content: plaintext, encryption: 'NONE' },
+        'SENT'
+      )
+    );
     await conversationRepository.updateLastMessage(
       String(broadcast.conversationId),
-      broadcast.content,
+      plaintext,
       broadcast.sentAt
     );
     queueDeliveryAck({
@@ -58,5 +76,7 @@ export async function resyncPendingInbox(recipientUserId: number): Promise<void>
 /** Seeds SQLite from the server after login or session restore. */
 export async function bootstrapLocalStore(recipientUserId: number): Promise<void> {
   await resyncConversationsFromServer();
+  // Identity must exist before decrypting SIGNAL_V1 pending rows.
+  await ensureKeysPublished();
   await resyncPendingInbox(recipientUserId);
 }

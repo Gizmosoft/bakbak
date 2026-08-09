@@ -5,12 +5,15 @@ import * as conversationRepository from '@/db/repositories/conversation.reposito
 import * as messageRepository from '@/db/repositories/message.repository';
 import * as outboxRepository from '@/db/repositories/outbox.repository';
 import { queryKeys } from '@/constants/query-keys';
+import {
+  decryptFromPeer,
+  encryptForPeer,
+} from '@/crypto';
 import type {
   ChatMessageBroadcast,
   DeliveryAck,
   Message,
   MessageResponse,
-  MessageStatus,
 } from '@/types/message';
 import { envelopeToMessage } from '@/types/message';
 import { chatClient } from '@/websocket/chat.client';
@@ -58,6 +61,45 @@ export async function invalidateMessageQueries(
   await queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
 }
 
+async function resolvePeerUserId(
+  conversationId: number,
+  currentUserId: number,
+  otherUserId?: number
+): Promise<number> {
+  if (otherUserId != null && otherUserId !== currentUserId) {
+    return otherUserId;
+  }
+  const conversation = await conversationRepository.getConversation(String(conversationId));
+  if (!conversation) {
+    throw new Error(`Conversation ${conversationId} not found locally`);
+  }
+  return Number(conversation.otherUserId);
+}
+
+async function encryptOutboundContent(
+  conversationId: number,
+  senderId: number,
+  plaintext: string
+): Promise<string> {
+  const peerUserId = await resolvePeerUserId(conversationId, senderId);
+  return encryptForPeer(peerUserId, plaintext);
+}
+
+async function decryptInboundContent(
+  broadcast: ChatMessageBroadcast,
+  currentUserId: number
+): Promise<string> {
+  const encryption = broadcast.encryption ?? 'NONE';
+  if (encryption !== 'SIGNAL_V1') {
+    return broadcast.content;
+  }
+  if (broadcast.senderId === currentUserId) {
+    // Own echo already stored as plaintext locally; ignore ciphertext body.
+    return broadcast.content;
+  }
+  return decryptFromPeer(broadcast.senderId, broadcast.content);
+}
+
 export async function prepareOutboundMessage(
   queryClient: QueryClient,
   conversationId: number,
@@ -75,6 +117,7 @@ export async function prepareOutboundMessage(
     sentAt,
     serverReceivedAt: null,
     status: 'SENDING',
+    encryption: 'NONE',
   };
 
   await outboxRepository.enqueue({
@@ -129,22 +172,39 @@ export async function persistIncomingMessage(
   }
 
   const isOwnMessage = broadcast.senderId === currentUserId;
-  await messageRepository.insertMessage(envelopeToMessage(broadcast, isOwnMessage ? 'SENT' : 'SENT'));
+  if (isOwnMessage) {
+    // Sender already has plaintext locally; sent echo confirmation is handled separately.
+    return;
+  }
+
+  let plaintext: string;
+  try {
+    plaintext = await decryptInboundContent(broadcast, currentUserId);
+  } catch (error) {
+    console.warn('Failed to decrypt inbound message', broadcast.id, error);
+    plaintext = '[Unable to decrypt message]';
+  }
+
+  const localEnvelope = {
+    ...broadcast,
+    content: plaintext,
+    encryption: 'NONE' as const,
+  };
+
+  await messageRepository.insertMessage(envelopeToMessage(localEnvelope, 'SENT'));
   await conversationRepository.updateLastMessage(
     String(broadcast.conversationId),
-    broadcast.content,
+    plaintext,
     broadcast.sentAt
   );
   await invalidateMessageQueries(queryClient, broadcast.conversationId);
 
-  if (!isOwnMessage) {
-    sendDeliveryAckOnce({
-      messageId: broadcast.id,
-      conversationId: broadcast.conversationId,
-      recipientId: currentUserId,
-      ackedAt: new Date().toISOString(),
-    });
-  }
+  sendDeliveryAckOnce({
+    messageId: broadcast.id,
+    conversationId: broadcast.conversationId,
+    recipientId: currentUserId,
+    ackedAt: new Date().toISOString(),
+  });
 }
 
 export async function retryFailedMessage(
@@ -167,11 +227,17 @@ export async function retryFailedMessage(
     throw new Error('Chat is not connected');
   }
 
+  const ciphertext = await encryptOutboundContent(
+    message.conversationId,
+    senderId,
+    message.content
+  );
   await chatClient.sendMessage(
     message.conversationId,
     senderId,
-    message.content,
-    message.clientId
+    ciphertext,
+    message.clientId,
+    'SIGNAL_V1'
   );
 }
 
@@ -190,11 +256,17 @@ export async function retryPendingOutbox(
     }
 
     try {
+      const ciphertext = await encryptOutboundContent(
+        Number(item.conversationId),
+        senderId,
+        item.content
+      );
       await chatClient.sendMessage(
         Number(item.conversationId),
         senderId,
-        item.content,
-        item.id
+        ciphertext,
+        item.id,
+        'SIGNAL_V1'
       );
     } catch {
       await outboxRepository.incrementRetry(item.id);
@@ -217,7 +289,13 @@ export async function sendOutboundMessage(
     throw new Error('Chat is not connected');
   }
 
-  await chatClient.sendMessage(conversationId, senderId, content, clientId);
+  try {
+    const ciphertext = await encryptOutboundContent(conversationId, senderId, content);
+    await chatClient.sendMessage(conversationId, senderId, ciphertext, clientId, 'SIGNAL_V1');
+  } catch (error) {
+    await failOutboundMessage(queryClient, clientId, conversationId);
+    throw error;
+  }
 }
 
 export { MESSAGE_PAGE_SIZE, MAX_SEND_RETRIES };

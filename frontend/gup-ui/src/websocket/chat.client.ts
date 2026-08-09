@@ -2,7 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { getStompHost } from '@/config/env';
-import type { ChatMessageBroadcast, DeliveryAck } from '@/types/message';
+import type { ChatMessageBroadcast, DeliveryAck, EncryptionType } from '@/types/message';
 import {
   buildStompFrame,
   parseIncomingPayload,
@@ -171,7 +171,8 @@ class ChatWebSocketClient {
     conversationId: number,
     _senderId: number,
     content: string,
-    existingClientId?: string
+    existingClientId?: string,
+    encryption: EncryptionType = 'SIGNAL_V1'
   ): Promise<string> {
     const clientId = existingClientId ?? Crypto.randomUUID();
 
@@ -179,7 +180,7 @@ class ChatWebSocketClient {
       throw new Error('Chat is not connected');
     }
 
-    this.transmitChatMessage(conversationId, clientId, content);
+    this.transmitChatMessage(conversationId, clientId, content, encryption);
     this.scheduleSendTimeout(clientId, conversationId);
     return clientId;
   }
@@ -214,8 +215,13 @@ class ChatWebSocketClient {
     );
   }
 
-  private transmitChatMessage(conversationId: number, clientId: string, content: string): void {
-    const body = JSON.stringify({ id: clientId, content });
+  private transmitChatMessage(
+    conversationId: number,
+    clientId: string,
+    content: string,
+    encryption: EncryptionType
+  ): void {
+    const body = JSON.stringify({ id: clientId, content, encryption });
     this.sendRaw(
       buildStompFrame(
         'SEND',
