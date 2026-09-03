@@ -36,6 +36,7 @@ class MessageServiceTest {
 	@Mock UserRepository userRepository;
 	@Mock OutboxService outboxService;
 	@Mock PresenceService presenceService;
+	@Mock AttachmentService attachmentService;
 	@Mock SimpMessagingTemplate messagingTemplate;
 
 	MessageService messageService;
@@ -48,6 +49,7 @@ class MessageServiceTest {
 			userRepository,
 			outboxService,
 			presenceService,
+			attachmentService,
 			messagingTemplate
 		);
 	}
@@ -70,7 +72,8 @@ class MessageServiceTest {
 			SENDER_ID,
 			messageId,
 			"hello",
-			uk.deadcatlab.bakbak.dto.EncryptionType.NONE
+			uk.deadcatlab.bakbak.dto.EncryptionType.NONE,
+			null
 		);
 
 		verify(messagingTemplate).convertAndSend(eq("/topic/conversation/10"), any(ChatMessageBroadcast.class));
@@ -99,7 +102,8 @@ class MessageServiceTest {
 			SENDER_ID,
 			null,
 			"hello",
-			uk.deadcatlab.bakbak.dto.EncryptionType.SIGNAL_V1
+			uk.deadcatlab.bakbak.dto.EncryptionType.SIGNAL_V1,
+			null
 		);
 
 		verify(messagingTemplate).convertAndSend(eq("/topic/conversation/10"), any(ChatMessageBroadcast.class));
@@ -127,7 +131,8 @@ class MessageServiceTest {
 			SENDER_ID,
 			null,
 			"hello",
-			uk.deadcatlab.bakbak.dto.EncryptionType.NONE
+			uk.deadcatlab.bakbak.dto.EncryptionType.NONE,
+			null
 		);
 
 		verify(outboxService).enqueue(any(OutboxMessage.class));

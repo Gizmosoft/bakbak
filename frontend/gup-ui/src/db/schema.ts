@@ -60,3 +60,9 @@ CREATE TABLE IF NOT EXISTS signal_identity_peers (
 export const ADD_MESSAGES_ENCRYPTION_COLUMN = `
 ALTER TABLE messages ADD COLUMN encryption TEXT NOT NULL DEFAULT 'NONE';
 `;
+
+export const ADD_MESSAGES_ATTACHMENT_COLUMNS = `
+ALTER TABLE messages ADD COLUMN attachment_id TEXT;
+ALTER TABLE messages ADD COLUMN attachment_mime_type TEXT;
+ALTER TABLE messages ADD COLUMN attachment_size_bytes INTEGER;
+`;

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uk.deadcatlab.bakbak.dto.EncryptionType;
 import uk.deadcatlab.bakbak.dto.MessageType;
+import uk.deadcatlab.bakbak.dto.response.AttachmentSummary;
 import uk.deadcatlab.bakbak.dto.response.ChatMessageBroadcast;
 import uk.deadcatlab.bakbak.exception.ForbiddenException;
 import uk.deadcatlab.bakbak.exception.ResourceNotFoundException;
@@ -43,6 +44,7 @@ public class MessageService {
 	private final UserRepository userRepository;
 	private final OutboxService outboxService;
 	private final PresenceService presenceService;
+	private final AttachmentService attachmentService;
 	private final SimpMessagingTemplate messagingTemplate;
 
 	public MessageService(
@@ -51,6 +53,7 @@ public class MessageService {
 		UserRepository userRepository,
 		OutboxService outboxService,
 		PresenceService presenceService,
+		AttachmentService attachmentService,
 		SimpMessagingTemplate messagingTemplate
 	) {
 		this.conversationRepository = conversationRepository;
@@ -58,6 +61,7 @@ public class MessageService {
 		this.userRepository = userRepository;
 		this.outboxService = outboxService;
 		this.presenceService = presenceService;
+		this.attachmentService = attachmentService;
 		this.messagingTemplate = messagingTemplate;
 	}
 
@@ -71,7 +75,8 @@ public class MessageService {
 		Long senderId,
 		UUID messageId,
 		String content,
-		EncryptionType encryption
+		EncryptionType encryption,
+		UUID attachmentId
 	) {
 		if (!conversationRepository.existsById(conversationId)) {
 			throw new ResourceNotFoundException("Conversation not found");
@@ -82,15 +87,23 @@ public class MessageService {
 		EncryptionType effectiveEncryption = encryption != null ? encryption : EncryptionType.NONE;
 		UUID envelopeId = messageId != null ? messageId : UUID.randomUUID();
 		Instant now = Instant.now();
+
+		AttachmentSummary attachment = null;
+		if (attachmentId != null) {
+			attachment = attachmentService.confirmForMessage(attachmentId, envelopeId, conversationId, senderId);
+		}
+
+		String effectiveContent = content != null ? content : "";
 		ChatMessageBroadcast envelope = new ChatMessageBroadcast(
 			envelopeId,
 			conversationId,
 			senderId,
-			content,
+			effectiveContent,
 			now,
 			now,
 			MessageType.CHAT,
-			effectiveEncryption
+			effectiveEncryption,
+			attachment
 		);
 
 		// Fast path for clients currently viewing this conversation.
@@ -108,8 +121,9 @@ public class MessageService {
 				.senderId(senderId)
 				.recipientId(recipientId)
 				.messageId(envelopeId)
-				.content(content)
+				.content(effectiveContent)
 				.encryption(effectiveEncryption)
+				.attachmentId(attachmentId)
 				.createdAt(now)
 				.build());
 
@@ -177,6 +191,7 @@ public class MessageService {
 	public void pushPendingInbox(Long recipientId, String username) {
 		for (OutboxMessage row : outboxService.drainForRecipient(recipientId)) {
 			EncryptionType encryption = row.getEncryption() != null ? row.getEncryption() : EncryptionType.NONE;
+			AttachmentSummary attachment = resolveAttachment(row.getAttachmentId());
 			ChatMessageBroadcast envelope = new ChatMessageBroadcast(
 				row.getMessageId(),
 				row.getConversationId(),
@@ -185,10 +200,18 @@ public class MessageService {
 				row.getCreatedAt(),
 				row.getCreatedAt(),
 				MessageType.CHAT,
-				encryption
+				encryption,
+				attachment
 			);
 			messagingTemplate.convertAndSendToUser(username, INBOX_QUEUE, envelope);
 		}
+	}
+
+	private AttachmentSummary resolveAttachment(UUID attachmentId) {
+		if (attachmentId == null) {
+			return null;
+		}
+		return attachmentService.loadSummary(attachmentId);
 	}
 
 	private static String topicDestination(Long conversationId) {

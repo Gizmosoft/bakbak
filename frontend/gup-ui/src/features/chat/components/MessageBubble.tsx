@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatMessageTime } from '@/lib/format';
+import { MessageAttachment } from '@/features/chat/components/MessageAttachment';
 import type { MessageResponse, MessageStatus } from '@/types/message';
 import { retryFailedMessage } from '@/websocket/message-sync';
 
@@ -40,9 +41,14 @@ export function MessageBubble({ message, isOwnMessage, senderId }: MessageBubble
 
   const bubble = (
     <View style={[styles.bubble, isOwnMessage ? styles.bubbleOwn : styles.bubbleOther]}>
-      <Text style={[styles.content, isOwnMessage ? styles.contentOwn : styles.contentOther]}>
-        {message.content}
-      </Text>
+      {message.attachment ? (
+        <MessageAttachment attachment={message.attachment} isOwnMessage={isOwnMessage} />
+      ) : null}
+      {message.content ? (
+        <Text style={[styles.content, isOwnMessage ? styles.contentOwn : styles.contentOther]}>
+          {message.content}
+        </Text>
+      ) : null}
       <View style={styles.metaRow}>
         <Text style={[styles.time, isOwnMessage ? styles.timeOwn : styles.timeOther]}>
           {formatMessageTime(message.sentAt)}

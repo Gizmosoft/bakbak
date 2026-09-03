@@ -48,7 +48,14 @@ public class ChatController {
 		Principal principal
 	) {
 		long senderId = requireUserId(principal);
-		messageService.send(conversationId, senderId, request.id(), request.content(), request.encryption());
+		messageService.send(
+			conversationId,
+			senderId,
+			request.id(),
+			request.content(),
+			request.encryption(),
+			request.attachmentId()
+		);
 	}
 
 	@MessageMapping("/ack")

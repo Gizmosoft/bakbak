@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import {
+  ADD_MESSAGES_ATTACHMENT_COLUMNS,
   ADD_MESSAGES_ENCRYPTION_COLUMN,
   CREATE_CONVERSATIONS_TABLE,
   CREATE_MESSAGES_CONVERSATION_INDEX,
@@ -22,6 +23,7 @@ const MIGRATIONS: Record<number, string[]> = {
     CREATE_SIGNAL_IDENTITY_PEERS_TABLE,
     ADD_MESSAGES_ENCRYPTION_COLUMN,
   ],
+  3: [ADD_MESSAGES_ATTACHMENT_COLUMNS],
 };
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {

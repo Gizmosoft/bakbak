@@ -26,6 +26,7 @@ import uk.deadcatlab.bakbak.model.OutboxMessage;
 import uk.deadcatlab.bakbak.security.JwtAuthFilter;
 import uk.deadcatlab.bakbak.security.JwtUtil;
 import uk.deadcatlab.bakbak.security.UserDetailsServiceImpl;
+import uk.deadcatlab.bakbak.service.AttachmentService;
 import uk.deadcatlab.bakbak.service.OutboxService;
 import uk.deadcatlab.bakbak.service.UserService;
 
@@ -47,6 +48,7 @@ class InboxControllerTest {
 	@Autowired MockMvc mockMvc;
 
 	@MockitoBean OutboxService outboxService;
+	@MockitoBean AttachmentService attachmentService;
 	@MockitoBean UserService userService;
 	@MockitoBean UserDetailsServiceImpl userDetailsService;
 

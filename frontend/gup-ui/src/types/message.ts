@@ -6,6 +6,13 @@ export type MessageStatus = 'SENDING' | 'SENT' | 'DELIVERED' | 'FAILED';
 /** Content encoding on the wire / in server outbox. */
 export type EncryptionType = 'NONE' | 'SIGNAL_V1';
 
+/** Attachment metadata relayed in message broadcasts (no presigned URLs). */
+export type AttachmentSummary = {
+  id: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 /**
  * Canonical message envelope shared across WebSocket send, relay broadcast, and SQLite insert.
  */
@@ -20,6 +27,7 @@ export type MessageEnvelope = {
   serverReceivedAt: string | null;
   type: MessageType;
   encryption?: EncryptionType;
+  attachment?: AttachmentSummary | null;
 };
 
 /** Payload broadcast to /topic/conversation/{conversationId} and user-specific relay queues. */
@@ -46,6 +54,7 @@ export type Message = {
   /** Client-generated UUID before send; matches envelope id for outbound messages. */
   clientId: string;
   encryption?: EncryptionType;
+  attachment?: AttachmentSummary | null;
 };
 
 /** UI-facing message row (SQLite-backed). */
@@ -60,6 +69,7 @@ export type MessageResponse = {
   status: MessageStatus;
   clientId: string;
   encryption?: EncryptionType;
+  attachment?: AttachmentSummary | null;
 };
 
 /** Inbound STOMP payload for SEND /app/chat/{conversationId}. */
@@ -67,6 +77,7 @@ export type SendMessageRequest = {
   id?: string;
   content: string;
   encryption?: EncryptionType;
+  attachmentId?: string;
 };
 
 /** Client-side send queue row in SQLite {@code outbox_pending}. */
@@ -89,6 +100,7 @@ export function messageToResponse(message: Message): MessageResponse {
     status: message.status,
     clientId: message.clientId,
     encryption: message.encryption ?? 'NONE',
+    attachment: message.attachment ?? null,
   };
 }
 
@@ -106,5 +118,6 @@ export function envelopeToMessage(
     serverReceivedAt: envelope.serverReceivedAt,
     status,
     encryption: envelope.encryption ?? 'NONE',
+    attachment: envelope.attachment ?? null,
   };
 }

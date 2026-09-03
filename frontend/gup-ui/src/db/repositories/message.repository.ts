@@ -1,5 +1,5 @@
 import { executeAsync, getAllAsync, getFirstAsync } from '@/db/client';
-import type { Message, MessageEnvelope, MessageStatus } from '@/types/message';
+import type { AttachmentSummary, Message, MessageEnvelope, MessageStatus } from '@/types/message';
 import { envelopeToMessage } from '@/types/message';
 
 type MessageRow = {
@@ -12,7 +12,21 @@ type MessageRow = {
   status: MessageStatus;
   client_id: string;
   encryption?: string | null;
+  attachment_id?: string | null;
+  attachment_mime_type?: string | null;
+  attachment_size_bytes?: number | null;
 };
+
+function mapAttachment(row: MessageRow): AttachmentSummary | null {
+  if (!row.attachment_id || !row.attachment_mime_type || row.attachment_size_bytes == null) {
+    return null;
+  }
+  return {
+    id: row.attachment_id,
+    mimeType: row.attachment_mime_type,
+    sizeBytes: row.attachment_size_bytes,
+  };
+}
 
 function mapRow(row: MessageRow): Message {
   return {
@@ -25,6 +39,7 @@ function mapRow(row: MessageRow): Message {
     status: row.status,
     clientId: row.client_id,
     encryption: (row.encryption as Message['encryption']) ?? 'NONE',
+    attachment: mapAttachment(row),
   };
 }
 
@@ -33,11 +48,13 @@ export async function insertMessage(
   status?: MessageStatus
 ): Promise<void> {
   const message = 'clientId' in msg ? msg : envelopeToMessage(msg, status ?? 'SENT');
+  const attachment = message.attachment ?? null;
 
   await executeAsync(
     `INSERT OR IGNORE INTO messages (
-      id, conversation_id, sender_id, content, sent_at, server_received_at, status, client_id, encryption
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, conversation_id, sender_id, content, sent_at, server_received_at,
+      status, client_id, encryption, attachment_id, attachment_mime_type, attachment_size_bytes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       message.id,
       String(message.conversationId),
@@ -48,6 +65,9 @@ export async function insertMessage(
       message.status,
       message.clientId,
       message.encryption ?? 'NONE',
+      attachment?.id ?? null,
+      attachment?.mimeType ?? null,
+      attachment?.sizeBytes ?? null,
     ]
   );
 }

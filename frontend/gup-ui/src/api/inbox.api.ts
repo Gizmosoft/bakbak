@@ -1,6 +1,6 @@
 import { apiRequest } from '@/api/client';
 import { API_PATHS } from '@/constants/api-paths';
-import type { EncryptionType, MessageType } from '@/types/message';
+import type { AttachmentSummary, EncryptionType, MessageType } from '@/types/message';
 
 export type PendingMessageResponse = {
   id: string;
@@ -11,6 +11,7 @@ export type PendingMessageResponse = {
   serverReceivedAt: string | null;
   type: MessageType;
   encryption?: EncryptionType;
+  attachment?: AttachmentSummary | null;
 };
 
 export function listPendingInbox(): Promise<PendingMessageResponse[]> {

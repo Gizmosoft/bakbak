@@ -172,7 +172,8 @@ class ChatWebSocketClient {
     _senderId: number,
     content: string,
     existingClientId?: string,
-    encryption: EncryptionType = 'SIGNAL_V1'
+    encryption: EncryptionType = 'SIGNAL_V1',
+    attachmentId?: string
   ): Promise<string> {
     const clientId = existingClientId ?? Crypto.randomUUID();
 
@@ -180,7 +181,7 @@ class ChatWebSocketClient {
       throw new Error('Chat is not connected');
     }
 
-    this.transmitChatMessage(conversationId, clientId, content, encryption);
+    this.transmitChatMessage(conversationId, clientId, content, encryption, attachmentId);
     this.scheduleSendTimeout(clientId, conversationId);
     return clientId;
   }
@@ -219,9 +220,15 @@ class ChatWebSocketClient {
     conversationId: number,
     clientId: string,
     content: string,
-    encryption: EncryptionType
+    encryption: EncryptionType,
+    attachmentId?: string
   ): void {
-    const body = JSON.stringify({ id: clientId, content, encryption });
+    const body = JSON.stringify({
+      id: clientId,
+      content,
+      encryption,
+      ...(attachmentId ? { attachmentId } : {}),
+    });
     this.sendRaw(
       buildStompFrame(
         'SEND',

@@ -1,6 +1,10 @@
 import * as Crypto from 'expo-crypto';
 import type { QueryClient } from '@tanstack/react-query';
 
+import {
+  createAttachmentIntent,
+  uploadToPresignedUrl,
+} from '@/api/attachments.api';
 import * as conversationRepository from '@/db/repositories/conversation.repository';
 import * as messageRepository from '@/db/repositories/message.repository';
 import * as outboxRepository from '@/db/repositories/outbox.repository';
@@ -10,6 +14,7 @@ import {
   encryptForPeer,
 } from '@/crypto';
 import type {
+  AttachmentSummary,
   ChatMessageBroadcast,
   DeliveryAck,
   Message,
@@ -20,6 +25,13 @@ import { chatClient } from '@/websocket/chat.client';
 
 const MESSAGE_PAGE_SIZE = 50;
 const MAX_SEND_RETRIES = 5;
+
+export type OutboundAttachment = {
+  uri: string;
+  mimeType: string;
+  sizeBytes: number;
+  fileName: string;
+};
 
 const pendingAcks: DeliveryAck[] = [];
 /** In-session dedupe so topic + inbox + reconnect resync do not ACK the same message twice. */
@@ -105,7 +117,8 @@ export async function prepareOutboundMessage(
   conversationId: number,
   senderId: number,
   content: string,
-  clientId: string
+  clientId: string,
+  attachment?: AttachmentSummary | null
 ): Promise<Message> {
   const sentAt = new Date().toISOString();
   const message: Message = {
@@ -118,6 +131,7 @@ export async function prepareOutboundMessage(
     serverReceivedAt: null,
     status: 'SENDING',
     encryption: 'NONE',
+    attachment: attachment ?? null,
   };
 
   await outboxRepository.enqueue({
@@ -189,12 +203,13 @@ export async function persistIncomingMessage(
     ...broadcast,
     content: plaintext,
     encryption: 'NONE' as const,
+    attachment: broadcast.attachment ?? null,
   };
 
   await messageRepository.insertMessage(envelopeToMessage(localEnvelope, 'SENT'));
   await conversationRepository.updateLastMessage(
     String(broadcast.conversationId),
-    plaintext,
+    previewForMessage(plaintext, broadcast.attachment),
     broadcast.sentAt
   );
   await invalidateMessageQueries(queryClient, broadcast.conversationId);
@@ -280,22 +295,79 @@ export async function sendOutboundMessage(
   queryClient: QueryClient,
   conversationId: number,
   senderId: number,
-  content: string
+  content: string,
+  outboundAttachment?: OutboundAttachment
 ): Promise<void> {
   const clientId = Crypto.randomUUID();
-  await prepareOutboundMessage(queryClient, conversationId, senderId, content, clientId);
+  let attachmentSummary: AttachmentSummary | null = null;
+
+  if (outboundAttachment) {
+    const intent = await createAttachmentIntent({
+      conversationId,
+      mimeType: outboundAttachment.mimeType,
+      sizeBytes: outboundAttachment.sizeBytes,
+      fileName: outboundAttachment.fileName,
+    });
+    await uploadToPresignedUrl(
+      intent.uploadUrl,
+      outboundAttachment.uri,
+      outboundAttachment.mimeType
+    );
+    attachmentSummary = {
+      id: intent.attachmentId,
+      mimeType: outboundAttachment.mimeType,
+      sizeBytes: outboundAttachment.sizeBytes,
+    };
+  }
+
+  await prepareOutboundMessage(
+    queryClient,
+    conversationId,
+    senderId,
+    content,
+    clientId,
+    attachmentSummary
+  );
 
   if (!chatClient.isConnected()) {
     throw new Error('Chat is not connected');
   }
 
   try {
-    const ciphertext = await encryptOutboundContent(conversationId, senderId, content);
-    await chatClient.sendMessage(conversationId, senderId, ciphertext, clientId, 'SIGNAL_V1');
+    const ciphertext = content
+      ? await encryptOutboundContent(conversationId, senderId, content)
+      : '';
+    await chatClient.sendMessage(
+      conversationId,
+      senderId,
+      ciphertext,
+      clientId,
+      content ? 'SIGNAL_V1' : 'NONE',
+      attachmentSummary?.id
+    );
   } catch (error) {
     await failOutboundMessage(queryClient, clientId, conversationId);
     throw error;
   }
+}
+
+function previewForMessage(content: string, attachment?: AttachmentSummary | null): string {
+  if (content.trim()) {
+    return content;
+  }
+  if (!attachment) {
+    return '';
+  }
+  if (attachment.mimeType.startsWith('image/')) {
+    return '📷 Photo';
+  }
+  if (attachment.mimeType.startsWith('video/')) {
+    return '🎬 Video';
+  }
+  if (attachment.mimeType.startsWith('audio/')) {
+    return '🎵 Audio';
+  }
+  return '📎 Attachment';
 }
 
 export { MESSAGE_PAGE_SIZE, MAX_SEND_RETRIES };

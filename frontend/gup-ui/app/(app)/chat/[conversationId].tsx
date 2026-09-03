@@ -27,7 +27,7 @@ import { useConversations } from '@/features/conversations/hooks/useConversation
 import { useAuth } from '@/providers/AuthProvider';
 import { useChatDrafts } from '@/providers/ChatDraftProvider';
 import { chatClient } from '@/websocket/chat.client';
-import { sendOutboundMessage } from '@/websocket/message-sync';
+import { sendOutboundMessage, type OutboundAttachment } from '@/websocket/message-sync';
 import type { MessageResponse } from '@/types/message';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -86,8 +86,11 @@ export default function ChatScreen() {
   );
 
   const handleSend = useCallback(
-    async (content: string) => {
-      const parsed = sendMessageSchema.safeParse({ content });
+    async (content: string, attachment?: OutboundAttachment) => {
+      const parsed = sendMessageSchema.safeParse({
+        content,
+        hasAttachment: attachment != null,
+      });
       if (!parsed.success) {
         throw new Error(parsed.error.issues[0]?.message ?? 'Invalid message');
       }
@@ -102,7 +105,8 @@ export default function ChatScreen() {
           queryClient,
           conversationId,
           user.id,
-          parsed.data.content
+          parsed.data.content,
+          attachment
         );
         clearDraft(conversationId);
       } catch (err) {

@@ -13,53 +13,48 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import uk.deadcatlab.bakbak.dto.EncryptionType;
+import uk.deadcatlab.bakbak.dto.AttachmentStatus;
 
 /**
- * Temporary server-side row for offline message delivery.
+ * Metadata for a media object in S3-compatible storage.
  *
- * <p>Deleted after the recipient ACKs via {@code SEND /app/ack}. Client-generated {@code messageId}
- * provides idempotent enqueue per recipient.</p>
+ * <p>Only {@code object_key} is persisted; presigned URLs are minted on demand and never stored.</p>
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "outbox")
-public class OutboxMessage {
+@Table(name = "attachments")
+public class Attachment {
 
 	@Id
 	private UUID id;
 
+	@Column(name = "message_id")
+	private UUID messageId;
+
+	@Column(name = "uploader_id", nullable = false)
+	private Long uploaderId;
+
 	@Column(name = "conversation_id", nullable = false)
 	private Long conversationId;
 
-	@Column(name = "sender_id", nullable = false)
-	private Long senderId;
+	@Column(name = "object_key", nullable = false, length = 512)
+	private String objectKey;
 
-	@Column(name = "recipient_id", nullable = false)
-	private Long recipientId;
+	@Column(name = "mime_type", nullable = false, length = 128)
+	private String mimeType;
 
-	@Column(name = "message_id", nullable = false)
-	private UUID messageId;
-
-	@Column(nullable = false, columnDefinition = "TEXT")
-	private String content;
+	@Column(name = "size_bytes", nullable = false)
+	private long sizeBytes;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 16)
-	@Builder.Default
-	private EncryptionType encryption = EncryptionType.NONE;
-
-	@Column(name = "attachment_id")
-	private UUID attachmentId;
+	private AttachmentStatus status;
 
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
-
-	@Column(name = "expires_at", nullable = false)
-	private Instant expiresAt;
 
 	@PrePersist
 	void onCreate() {
@@ -68,9 +63,6 @@ public class OutboxMessage {
 		}
 		if (createdAt == null) {
 			createdAt = Instant.now();
-		}
-		if (encryption == null) {
-			encryption = EncryptionType.NONE;
 		}
 	}
 }

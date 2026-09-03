@@ -5,7 +5,7 @@ import * as conversationRepository from '@/db/repositories/conversation.reposito
 import * as messageRepository from '@/db/repositories/message.repository';
 import { syncConversationsFromServer } from '@/db/sync/conversation-sync';
 import { queueDeliveryAck } from '@/websocket/message-sync';
-import type { ChatMessageBroadcast, EncryptionType } from '@/types/message';
+import type { AttachmentSummary, ChatMessageBroadcast, EncryptionType } from '@/types/message';
 import { envelopeToMessage } from '@/types/message';
 
 function pendingToBroadcast(pending: {
@@ -17,6 +17,7 @@ function pendingToBroadcast(pending: {
   serverReceivedAt: string | null;
   type: ChatMessageBroadcast['type'];
   encryption?: EncryptionType;
+  attachment?: ChatMessageBroadcast['attachment'];
 }): ChatMessageBroadcast {
   return {
     id: pending.id,
@@ -27,6 +28,7 @@ function pendingToBroadcast(pending: {
     serverReceivedAt: pending.serverReceivedAt,
     type: pending.type,
     encryption: pending.encryption ?? 'NONE',
+    attachment: pending.attachment ?? null,
   };
 }
 
@@ -55,13 +57,13 @@ export async function resyncPendingInbox(recipientUserId: number): Promise<void>
 
     await messageRepository.insertMessage(
       envelopeToMessage(
-        { ...broadcast, content: plaintext, encryption: 'NONE' },
+        { ...broadcast, content: plaintext, encryption: 'NONE', attachment: broadcast.attachment },
         'SENT'
       )
     );
     await conversationRepository.updateLastMessage(
       String(broadcast.conversationId),
-      plaintext,
+      previewForPendingMessage(plaintext, broadcast.attachment),
       broadcast.sentAt
     );
     queueDeliveryAck({
@@ -79,4 +81,26 @@ export async function bootstrapLocalStore(recipientUserId: number): Promise<void
   // Identity must exist before decrypting SIGNAL_V1 pending rows.
   await ensureKeysPublished();
   await resyncPendingInbox(recipientUserId);
+}
+
+function previewForPendingMessage(
+  content: string,
+  attachment?: AttachmentSummary | null
+): string {
+  if (content.trim()) {
+    return content;
+  }
+  if (!attachment) {
+    return '';
+  }
+  if (attachment.mimeType.startsWith('image/')) {
+    return '📷 Photo';
+  }
+  if (attachment.mimeType.startsWith('video/')) {
+    return '🎬 Video';
+  }
+  if (attachment.mimeType.startsWith('audio/')) {
+    return '🎵 Audio';
+  }
+  return '📎 Attachment';
 }

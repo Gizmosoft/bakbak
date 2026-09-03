@@ -17,10 +17,11 @@ public record PendingMessageResponse(
 	Instant sentAt,
 	Instant serverReceivedAt,
 	MessageType type,
-	EncryptionType encryption
+	EncryptionType encryption,
+	AttachmentSummary attachment
 ) {
 
-	public static PendingMessageResponse fromOutbox(OutboxMessage row) {
+	public static PendingMessageResponse fromOutbox(OutboxMessage row, AttachmentSummary attachment) {
 		EncryptionType encryption = row.getEncryption() != null ? row.getEncryption() : EncryptionType.NONE;
 		return new PendingMessageResponse(
 			row.getMessageId(),
@@ -30,7 +31,8 @@ public record PendingMessageResponse(
 			row.getCreatedAt(),
 			row.getCreatedAt(),
 			MessageType.CHAT,
-			encryption
+			encryption,
+			attachment
 		);
 	}
 
@@ -43,7 +45,8 @@ public record PendingMessageResponse(
 			sentAt,
 			serverReceivedAt,
 			type,
-			encryption
+			encryption,
+			attachment
 		);
 	}
 }

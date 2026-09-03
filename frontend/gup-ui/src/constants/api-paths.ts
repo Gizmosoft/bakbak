@@ -22,6 +22,10 @@ export const API_PATHS = {
     onetime: '/api/keys/onetime',
     status: '/api/keys/status',
   },
+  attachments: {
+    intent: '/api/attachments/intent',
+    downloadUrl: (attachmentId: string) => `/api/attachments/${attachmentId}/download-url`,
+  },
 } as const;
 
 export const API_LIMITS = {

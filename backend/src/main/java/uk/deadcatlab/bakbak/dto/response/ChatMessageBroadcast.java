@@ -21,11 +21,26 @@ public record ChatMessageBroadcast(
 	Instant sentAt,
 	Instant serverReceivedAt,
 	MessageType type,
-	EncryptionType encryption
+	EncryptionType encryption,
+	AttachmentSummary attachment
 ) {
 	public ChatMessageBroadcast {
 		if (encryption == null) {
 			encryption = EncryptionType.NONE;
 		}
+	}
+
+	/** Backward-compatible constructor without attachment metadata. */
+	public ChatMessageBroadcast(
+		UUID id,
+		Long conversationId,
+		Long senderId,
+		String content,
+		Instant sentAt,
+		Instant serverReceivedAt,
+		MessageType type,
+		EncryptionType encryption
+	) {
+		this(id, conversationId, senderId, content, sentAt, serverReceivedAt, type, encryption, null);
 	}
 }
